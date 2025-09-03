@@ -58,21 +58,20 @@ interface DiagramData {
                 </button>
                 <button (click)="toggleGrid()" class="btn-outline text-sm">Grid: {{ showGrid ? 'ON' : 'OFF' }}</button>
               </div>
-              <div class="flex items-center gap-2">
-                <button (click)="exportData()" class="btn-primary text-sm flex items-center">
+              <div class="relative">
+                <button (click)="toggleExportMenu()" class="btn-primary text-sm flex items-center">
                   <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Export JSON
+                  Export
+                  <svg class="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 </button>
-                <button (click)="exportSVG()" class="btn-outline text-sm flex items-center">
-                  <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3H6a2 2 0 00-2 2v14l4-4h6a2 2 0 002-2V5a2 2 0 00-2-2z"/></svg>
-                  Export SVG
-                </button>
-                <button (click)="exportPNG()" class="btn-outline text-sm flex items-center">
-                  <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16l5-5 4 4 5-6 4 5M3 19h18"/></svg>
-                  Export PNG
-                </button>
+                <div *ngIf="isExportMenuOpen" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 z-10" (click)="$event.stopPropagation()">
+                  <a (click)="exportData(); closeExportMenu()" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer">Export as JSON</a>
+                  <a (click)="exportSVG(); closeExportMenu()" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer">Export as SVG</a>
+                  <a (click)="exportPNG(); closeExportMenu()" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer">Export as PNG</a>
+                  <a (click)="exportPDF(); closeExportMenu()" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer">Export as PDF</a>
+                </div>
               </div>
             </div>
           </div>
