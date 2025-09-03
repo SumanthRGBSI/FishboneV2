@@ -751,7 +751,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   getLabelWidth(categoryIndex: number, causeIndex: number, text: string): number {
     const id = this.diagram.categories[categoryIndex]?.causes[causeIndex]?.id;
     if (id && this.measuredLabelWidth[id] != null) return this.measuredLabelWidth[id];
-    return this.getLabelWidthFromText(text);
+    return this.layoutConfig.fixedCauseWidth;
   }
   private getCharsPerLine(width: number): number { return Math.max(10, Math.floor(width / this.approxCharWidth)); }
   getTotalLines(text: string, width: number): number { const cpl = this.getCharsPerLine(width); return Math.max(1, Math.ceil(text.length / cpl)); }
