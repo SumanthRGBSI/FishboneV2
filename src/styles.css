@@ -12,7 +12,9 @@
   body {
     /* Subtle gradient background for app */
     @apply bg-gradient-to-br from-neutral-50 to-neutral-100 text-neutral-900;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
   }
 
   html {
