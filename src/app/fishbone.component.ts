@@ -104,8 +104,15 @@ interface DiagramData {
 
       <!-- Dynamic Fishbone Diagram Canvas -->
       <div class="max-w-full mx-auto">
-        <div class="bg-white rounded-lg shadow-card border border-neutral-200 overflow-x-auto fishbone-wrapper" [style.min-height.px]="canvasHeight">
-          <svg #diagramSvg [attr.width]="canvasWidth" [attr.height]="canvasHeight" [attr.viewBox]="'0 0 ' + canvasWidth + ' ' + canvasHeight" class="min-w-full h-full" (click)="clearFocus()">
+        <div class="bg-white rounded-lg shadow-card border border-neutral-200 overflow-x-auto fishbone-wrapper relative" [style.min-height.px]="canvasHeight">
+          <!-- Zoom/Pan overlay controls -->
+          <div class="absolute right-3 top-3 z-10 flex flex-col gap-2">
+            <button class="btn-secondary w-9 h-9 p-0" (click)="zoomIn()">+</button>
+            <button class="btn-secondary w-9 h-9 p-0" (click)="zoomOut()">−</button>
+            <button class="btn-outline w-9 h-9 p-0" (click)="resetView()">⤾</button>
+          </div>
+
+          <svg #diagramSvg [attr.width]="canvasWidth" [attr.height]="canvasHeight" [attr.viewBox]="viewX + ' ' + viewY + ' ' + viewW + ' ' + viewH" class="min-w-full h-full" (click)="clearFocus()" (wheel)="onWheel($event)" (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseleave)="onMouseUp()" (mouseup)="onMouseUp()">
             <!-- Background Grid -->
             <defs>
               <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -144,7 +151,7 @@ interface DiagramData {
 
               <!-- Category Causes: connectors -->
               <g *ngFor="let cause of category.causes; let j = index" (mouseenter)="hoveredCauseId = cause.id" (mouseleave)="hoveredCauseId = null">
-                <path [attr.d]="getCauseConnectorPath(i, j, cause.text)" stroke="#6b7280" [attr.stroke-width]="hoveredCauseId === cause.id ? 2 : 1.5" stroke-linejoin="round" stroke-linecap="round" fill="none" />
+                <path [attr.d]="getOrthogonalConnectorPath(i, j, cause.text)" stroke="#6b7280" [attr.stroke-width]="hoveredCauseId === cause.id ? 2 : 1.5" stroke-linejoin="round" stroke-linecap="round" fill="none" />
               </g>
 
               <!-- Delete Category Button (trash icon) -->
@@ -250,9 +257,7 @@ interface DiagramData {
   `,
   styles: [
     `
-      svg text {
-        user-select: none;
-      }
+      svg text { user-select: none; }
       .cursor-pointer:hover { opacity: 0.9; }
       .overflow-y-auto { scrollbar-width: thin; scrollbar-color: #d1d5db #f3f4f6; }
       .overflow-y-auto::-webkit-scrollbar { width: 4px; }
@@ -277,8 +282,10 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild("causeInput") causeInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild("modalRef") modalRef?: ElementRef<HTMLDivElement>;
 
-  // Measurement cache
+  // Measurement cache and offsets
   private measuredLabelWidth: Record<string, number> = {};
+  private yOffsets: Record<string, number> = {};
+
   private raf1: number | null = null;
   private raf2: number | null = null;
   private resizeObserver?: ResizeObserver;
@@ -298,6 +305,18 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   private INITIAL_X = 140;
   private LABEL_LEFT_PADDING = 16;
   private categoryXMap: Record<string, number> = {};
+  private categoryAngleMap: Record<string, number> = {};
+
+  // Pan and zoom viewBox
+  viewX = 0;
+  viewY = 0;
+  viewW = 0;
+  viewH = 0;
+  private isPanning = false;
+  private panStartX = 0;
+  private panStartY = 0;
+  private viewStartX = 0;
+  private viewStartY = 0;
 
   setFocus(category: Category, ev: MouseEvent) {
     ev.stopPropagation();
@@ -326,6 +345,9 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
           try {
             this.measureAllLabels();
             this.recomputeCategoryXMap();
+            this.recomputeAngles();
+            this.computeCollisionOffsets();
+            this.resetViewIfUnset();
           } catch (e) {
             console.warn("layout pass skipped due to error", e);
           }
@@ -384,6 +406,29 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.categoryXMap = newMap;
   }
+
+  private recomputeAngles() {
+    const map: Record<string, number> = {};
+    for (let i = 0; i < this.diagram.categories.length; i++) {
+      const cat = this.diagram.categories[i];
+      const complexity = this.getCategoryTotalHeight(i);
+      const minAngle = 35;
+      const maxAngle = 70;
+      const base = 45;
+      const t = Math.max(0, Math.min(1, (complexity - 120) / 240));
+      const angle = base + (maxAngle - base) * t; // 45..70
+      map[cat.id] = this.isTopSide(i) ? -angle : angle;
+    }
+    this.categoryAngleMap = map;
+  }
+
+  private getCategoryAngle(index: number): number {
+    const id = this.diagram.categories[index]?.id;
+    const a = id ? this.categoryAngleMap[id] : undefined;
+    if (typeof a === "number") return a;
+    return this.isTopSide(index) ? -45 : 45;
+  }
+
   diagram: DiagramData = { problemStatement: "", categories: [] };
 
   showGrid = false;
@@ -656,6 +701,16 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const padding = 12;
     return lines * this.lineHeightPx + padding;
   }
+
+  // Y with collision offsets
+  getLabelY(categoryIndex: number, causeIndex: number, text?: string): number {
+    const t = text ?? this.diagram.categories[categoryIndex]?.causes[causeIndex]?.text ?? "";
+    const base = this.getStackedCenterY(categoryIndex, causeIndex, t);
+    const id = this.diagram.categories[categoryIndex]?.causes[causeIndex]?.id;
+    const off = (id && this.yOffsets[id]) || 0;
+    return base + off;
+  }
+
   getLabelTopY(categoryIndex: number, causeIndex: number, text: string): number {
     const center = this.getLabelY(categoryIndex, causeIndex, text);
     const h = this.getLabelHeight(categoryIndex, causeIndex, text);
@@ -733,13 +788,13 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   getCategoryEndX(index: number): number {
     const startX = this.getCategoryX(index);
     const length = this.getCategoryLength(index);
-    const angle = this.isTopSide(index) ? -45 : 45;
+    const angle = this.getCategoryAngle(index);
     return startX + Math.cos((angle * Math.PI) / 180) * length;
   }
 
   getCategoryEndY(index: number): number {
     const length = this.getCategoryLength(index);
-    const angle = this.isTopSide(index) ? -45 : 45;
+    const angle = this.getCategoryAngle(index);
     return this.spineY + Math.sin((angle * Math.PI) / 180) * length;
   }
 
@@ -808,7 +863,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   private labelBaseOffset = 24;
   private labelHeight = 20;
   private minGap = 8;
-  private connectorShelf = 8;
+  private connectorShelf = 10;
   private connectorGap = 8;
 
   private getAntiCollisionStep(): number { return this.labelHeight + this.minGap; }
@@ -879,11 +934,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.getCategoryX(categoryIndex) - this.LABEL_LEFT_PADDING - maxW;
   }
 
-  getLabelY(categoryIndex: number, causeIndex: number, text?: string): number {
-    const t = text ?? this.diagram.categories[categoryIndex]?.causes[causeIndex]?.text ?? "";
-    return this.getStackedCenterY(categoryIndex, causeIndex, t);
-  }
-
   getLabelCenterX(categoryIndex: number, causeIndex: number, text: string): number {
     const w = this.getLabelWidth(categoryIndex, causeIndex, text);
     const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
@@ -902,6 +952,147 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return ax - this.connectorGap;
   }
 
+  // Orthogonal connector: from label right edge to ax-connectorGap, then vertical to ay, then horizontal to ax
+  getOrthogonalConnectorPath(categoryIndex: number, causeIndex: number, text: string): string {
+    const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
+    const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
+    const y = this.getLabelY(categoryIndex, causeIndex, text);
+    const xr = this.getLabelRightX(categoryIndex, causeIndex, text);
+    const xh = ax - this.connectorGap; // horizontal lane near bone
+    return `M ${xr} ${y} H ${xh} V ${ay} H ${ax}`;
+  }
+
+  isTopSide(index: number): boolean { return index % 2 === 0; }
+
+  // Collision-aware offsets computation
+  private computeCollisionOffsets() {
+    const margin = 6;
+    const top: { id: string; center: number; height: number; indexInfo: [number, number]; left: number; right: number }[] = [];
+    const bottom: { id: string; center: number; height: number; indexInfo: [number, number]; left: number; right: number }[] = [];
+
+    for (let i = 0; i < this.diagram.categories.length; i++) {
+      const cat = this.diagram.categories[i];
+      for (let j = 0; j < cat.causes.length; j++) {
+        const cause = cat.causes[j];
+        const text = cause.text;
+        const w = this.getLabelWidth(i, j, text);
+        const h = this.getLabelHeight(i, j, text);
+        const c = this.getStackedCenterY(i, j, text); // base without offsets
+        const left = this.getLabelLeftX(i, j, text);
+        const right = left + w;
+        const item = { id: cause.id, center: c, height: h, indexInfo: [i, j] as [number, number], left, right };
+        if (c < this.spineY) top.push(item); else bottom.push(item);
+      }
+    }
+
+    // Helper to adjust along one side, pushing away from spine and resolving overlaps
+    const adjust = (arr: typeof top, isTop: boolean) => {
+      // Pack from spine outward
+      arr.sort((a, b) => isTop ? b.center - a.center : a.center - b.center); // closest first
+      for (let k = 0; k < arr.length; k++) {
+        const prev = k === 0 ? null : arr[k - 1];
+        const cur = arr[k];
+        if (!prev) continue;
+        const prevTop = prev.center - prev.height / 2;
+        const prevBottom = prev.center + prev.height / 2;
+        let curTop = cur.center - cur.height / 2;
+        let curBottom = cur.center + cur.height / 2;
+        if (isTop) {
+          // ensure cur is above prev by margin
+          const allowedBottom = (prevTop - margin);
+          if (curBottom > allowedBottom) {
+            const newCenter = allowedBottom - cur.height / 2;
+            cur.center = newCenter;
+          }
+        } else {
+          // bottom side: ensure cur is below prev by margin
+          const allowedTop = (prevBottom + margin);
+          if (curTop < allowedTop) {
+            const newCenter = allowedTop + cur.height / 2;
+            cur.center = newCenter;
+          }
+        }
+      }
+    };
+
+    adjust(top, true);
+    adjust(bottom, false);
+
+    // Write offsets relative to base centers
+    const newOffsets: Record<string, number> = {};
+    for (const item of [...top, ...bottom]) {
+      const [i, j] = item.indexInfo;
+      const base = this.getStackedCenterY(i, j, this.diagram.categories[i].causes[j].text);
+      newOffsets[item.id] = item.center - base;
+    }
+    this.yOffsets = newOffsets;
+  }
+
+  // Helper for angles based on content height
+  private getCategoryTotalHeight(index: number): number {
+    const cat = this.diagram.categories[index];
+    if (!cat) return 0;
+    return cat.causes.reduce((sum, c, j) => sum + this.getLabelHeight(index, j, c.text) + (j > 0 ? this.minGap : 0), 0);
+  }
+
+  // Pan/Zoom
+  private resetViewIfUnset() {
+    if (this.viewW === 0 || this.viewH === 0) this.resetView();
+  }
+  resetView() {
+    this.viewX = 0;
+    this.viewY = 0;
+    this.viewW = this.canvasWidth;
+    this.viewH = this.canvasHeight;
+  }
+  zoom(factor: number, originX?: number, originY?: number) {
+    const minW = this.canvasWidth / 6;
+    const maxW = this.canvasWidth * 1.5;
+    const cx = originX ?? (this.viewX + this.viewW / 2);
+    const cy = originY ?? (this.viewY + this.viewH / 2);
+    const newW = Math.max(minW, Math.min(maxW, this.viewW * factor));
+    const newH = Math.max(minW * (this.canvasHeight / this.canvasWidth), Math.min(maxW * (this.canvasHeight / this.canvasWidth), this.viewH * factor));
+    this.viewX = cx - (cx - this.viewX) * (newW / this.viewW);
+    this.viewY = cy - (cy - this.viewY) * (newH / this.viewH);
+    this.viewW = newW;
+    this.viewH = newH;
+  }
+  zoomIn() { this.zoom(0.85); }
+  zoomOut() { this.zoom(1.15); }
+
+  onWheel(event: WheelEvent) {
+    event.preventDefault();
+    const svg = this.svgRef?.nativeElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const sx = ((event.clientX - rect.left) / rect.width) * this.viewW + this.viewX;
+    const sy = ((event.clientY - rect.top) / rect.height) * this.viewH + this.viewY;
+    const factor = event.deltaY < 0 ? 0.9 : 1.1;
+    this.zoom(factor, sx, sy);
+  }
+
+  onMouseDown(event: MouseEvent) {
+    this.isPanning = true;
+    this.panStartX = event.clientX;
+    this.panStartY = event.clientY;
+    this.viewStartX = this.viewX;
+    this.viewStartY = this.viewY;
+  }
+  onMouseMove(event: MouseEvent) {
+    if (!this.isPanning) return;
+    const svg = this.svgRef?.nativeElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const dxPx = event.clientX - this.panStartX;
+    const dyPx = event.clientY - this.panStartY;
+    const dx = (dxPx / rect.width) * this.viewW;
+    const dy = (dyPx / rect.height) * this.viewH;
+    this.viewX = this.viewStartX - dx;
+    this.viewY = this.viewStartY - dy;
+  }
+  onMouseUp() { this.isPanning = false; }
+
+  // Connector path (legacy kept if needed elsewhere)
   getCauseConnectorPath(categoryIndex: number, causeIndex: number, text: string): string {
     const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
     const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
@@ -911,7 +1102,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return `M ${xr} ${y} H ${shelfEnd} L ${ax} ${ay}`;
   }
 
-  isTopSide(index: number): boolean { return index % 2 === 0; }
+  isTop(index: number) { return this.isTopSide(index); }
 
   // Color utilities
   getTint(hex: string, alpha: number): string {
