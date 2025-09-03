@@ -58,7 +58,6 @@ interface DiagramData {
                   </svg>
                   Reset
                 </button>
-                <button (click)="toggleGrid()" class="btn-outline text-sm">Grid: {{ showGrid ? 'ON' : 'OFF' }}</button>
               </div>
               <div class="relative">
                 <button (click)="$event.stopPropagation(); toggleExportMenu()" class="btn-primary text-sm flex items-center">
@@ -122,17 +121,12 @@ interface DiagramData {
           </div>
 
           <svg #diagramSvg [attr.width]="canvasWidth" [attr.height]="canvasHeight" [attr.viewBox]="viewX + ' ' + viewY + ' ' + viewW + ' ' + viewH" class="min-w-full h-full" (click)="clearFocus()" (wheel)="onWheel($event)" (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseleave)="onMouseUp()" (mouseup)="onMouseUp()">
-            <!-- Background Grid -->
             <defs>
-              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f3f4f6" stroke-width="0.5" />
-              </pattern>
               <!-- Subtle drop shadow for bones -->
               <filter id="boneShadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000000" flood-opacity="0.08" />
               </filter>
             </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" *ngIf="showGrid" />
 
             <!-- Main Spine (Dynamic length) -->
             <line [attr.x1]="spineStartX" [attr.y1]="spineY" [attr.x2]="spineEndX" [attr.y2]="spineY" stroke="#111827" stroke-width="4" stroke-linecap="round" />
@@ -439,7 +433,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
   diagram: DiagramData = { problemStatement: "", categories: [] };
 
-  showGrid = false;
   showAddCauseModal = false;
   newCauseText = "";
   selectedPriority: Priority = "Medium";
@@ -619,7 +612,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  toggleGrid() { this.showGrid = !this.showGrid; }
 
   exportData() {
     const dataStr = JSON.stringify(this.diagram, null, 2);
