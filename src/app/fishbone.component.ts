@@ -903,7 +903,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-
   private getCategoryAngle(index: number): number {
     const angle = this.layoutConfig.boneAngle;
     return this.isTopSide(index) ? -angle : angle;
@@ -1142,7 +1141,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       this.mutationObserver?.disconnect?.();
     } catch {}
   }
-
 
   // Compute a content bounding box for export
   private getContentBoundingBox() {
@@ -1593,7 +1591,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.getLabelWidthFromText(text);
   }
 
-
   // Category positioning
   getCategoryX(index: number): number {
     const id = this.diagram.categories[index]?.id;
@@ -1800,8 +1797,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       return Math.max(m, w);
     }, 120);
   }
-
-
 
   getLabelLeftX(
     categoryIndex: number,
@@ -2017,8 +2012,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   onMouseUp() {
     this.isPanning = false;
   }
-
-
 
   // Color utilities
   getTint(hex: string, alpha: number): string {
