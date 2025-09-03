@@ -968,14 +968,20 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return ax - this.connectorGap;
   }
 
-  // Orthogonal connector: from label right edge to ax-connectorGap, then vertical to ay, then horizontal to ax
-  getOrthogonalConnectorPath(categoryIndex: number, causeIndex: number, text: string): string {
+  // Orthogonal connector using stable layout positions
+  getOrthogonalCauseConnectorPath(categoryIndex: number, cause: Cause, causeIndex: number): string {
     const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
     const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
-    const y = this.getLabelY(categoryIndex, causeIndex, text);
-    const xr = this.getLabelRightX(categoryIndex, causeIndex, text);
-    const xh = ax - this.connectorGap; // horizontal lane near bone
-    return `M ${xr} ${y} H ${xh} V ${ay} H ${ax}`;
+    if (!cause.layout) {
+      const y = this.getLabelY(categoryIndex, causeIndex, cause.text);
+      const xr = this.getLabelRightX(categoryIndex, causeIndex, cause.text);
+      const xh = ax - this.layoutConfig.connectorGap;
+      return `M ${xr} ${y} H ${xh} V ${ay} H ${ax}`;
+    }
+    const labelEdgeX = cause.layout.x + cause.layout.width;
+    const labelCenterY = cause.layout.y + cause.layout.height / 2;
+    const intermediateX = ax - 30;
+    return `M ${ax} ${ay} H ${intermediateX} V ${labelCenterY} H ${labelEdgeX}`;
   }
 
   isTopSide(index: number): boolean { return index % 2 === 0; }
