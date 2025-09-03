@@ -508,12 +508,9 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return Math.max(minHeight, topDepth + bottomDepth + 20);
   }
 
-  get spineStartX(): number { return 80; }
-  get spineEndX(): number { return this.canvasWidth - 250; }
+  get spineStartX(): number { return this.layoutConfig.spineStartX; }
   get spineY(): number { return this.canvasHeight / 2; }
-  get problemBoxX(): number { return this.spineEndX + 20; }
   get problemBoxY(): number { return this.spineY - 40; }
-  get problemBoxWidth(): number { return 200; }
   get problemBoxHeight(): number { return 80; }
 
   ngOnInit() {
