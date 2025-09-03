@@ -603,6 +603,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       const index = category.causes.indexOf(cause);
       if (index > -1) {
         category.causes.splice(index, 1);
+        this.runLayoutAfterRender();
       }
     }
   }
