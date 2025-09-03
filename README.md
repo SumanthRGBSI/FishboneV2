@@ -1,59 +1,129 @@
-# FusionAngularTailwindStarter
+# Interactive Fishbone (Ishikawa) Diagram Component
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.1.2.
+An Angular + Tailwind CSS component for building interactive Fishbone (Ishikawa) diagrams. It supports fast authoring of categories and causes, a compact collision-aware layout engine, pan/zoom, keyboard-friendly dialogs, and robust export to JSON, SVG, PNG, and PDF.
 
-## Development server
+This repository is ready-to-run and includes the component mounted at the app root.
 
-To start a local development server, run:
+## Tech Stack
+- Angular 20 (standalone components)
+- Tailwind CSS 3
+- SVG rendering with orthogonal connectors
+- jsPDF (via CDN) for PDF export
 
-```bash
-ng serve
+## Features
+- Diagram authoring
+  - Add/Edit/Delete categories and causes
+  - Priority levels: Critical, High, Medium, Low (colored indicators and subtle list highlighting)
+  - Inline title for the problem statement
+  - Quick menus for per-cause actions
+- Layout engine
+  - Fixed-width compact cause boxes for a clean, uniform look
+  - Orthogonal connectors aligned to category bones
+  - Collision-aware vertical stacking with consistent spacing
+  - Alternating top/bottom category bones for balanced distribution
+  - Dynamic canvas sizing based on content
+- Interactivity
+  - Focus mode per category (de-emphasizes others)
+  - Pan and zoom with mouse drag and wheel; reset, zoom-in, zoom-out buttons
+  - Tooltip preview for truncated text (ellipsis button)
+- Export
+  - JSON: raw diagram data
+  - SVG/PNG: foreignObject elements converted to pure SVG for portability and to avoid tainted canvas
+  - PDF: rendered via jsPDF using an intermediate canvas
+  - Safe fallbacks: when canvas export is blocked, download sanitized SVG instead
+- Theming and UI
+  - Tailwind-based design system with modern palette, shadows, and inputs
+  - Clean header with Reset and unified Export dropdown
+
+## Project Structure
+- src/app/fishbone.component.ts — main component (rendering, layout, interactivity, export)
+- src/app/app.ts — application shell mounting the component
+- src/styles.css — Tailwind layers, components, utilities, and app styles
+- tailwind.config.js — Tailwind theme extensions (colors, shadows, typography)
+- src/index.html — base document (adds jsPDF CDN)
+
+## Running Locally
+- Install deps: npm install
+- Start dev server: npm start (or ng serve)
+- Open the app: http://localhost:4200
+
+## Using the Component
+The app already renders the component at the root. If embedding elsewhere:
+
+```ts
+import { Component } from '@angular/core';
+import { FishboneComponent } from './fishbone.component';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [FishboneComponent],
+  template: '<app-fishbone></app-fishbone>',
+})
+export class App {}
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Data Model
+```ts
+interface Cause {
+  id: string;
+  text: string;
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  subCauses: Cause[]; // reserved for future nesting
+  layout?: { x: number; y: number; width: number; height: number }; // computed
+}
 
-## Code scaffolding
+interface Category {
+  id: string;
+  title: string;
+  causes: Cause[];
+  color: string; // assigned from a palette
+}
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
+interface DiagramData {
+  problemStatement: string;
+  categories: Category[];
+}
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Controls and UI
+- Problem statement: type directly in the header input
+- Add Category: create new category with a color from the palette
+- Category card: add/edit/delete causes in a compact list
+- Add Cause modal: text field plus segmented priority control
+- Focus mode: click a category bone to de-emphasize others; click empty canvas to clear
+- Zoom: + / − / reset buttons, or use mouse wheel and drag to pan
+- Export dropdown: JSON, SVG, PNG, PDF
 
-```bash
-ng generate --help
-```
+## Layout Engine Overview
+- Fixed-width cause boxes (Tailwind w-60) ensure tidy columns
+- Vertical levels calculated independently for top/bottom halves
+- Causes connect orthogonally to their category bone
+- Collision handling maintains minimum gaps and pushes labels away from the spine when needed
+- Canvas dimensions auto-scale to fit all content and the problem statement
 
-## Building
+## Export Details
+- JSON: serializes DiagramData
+- SVG/PNG/PDF: the component clones the SVG and converts all foreignObject elements into native SVG rectangles and text nodes
+  - Prevents browser "tainted canvas" errors
+  - Embeds a small stylesheet for consistent typography
+- PNG/PDF: rendered via an offscreen canvas; if the canvas is blocked, the sanitized SVG is downloaded as a safe fallback
+- Dependency: jsPDF is included via CDN in src/index.html
 
-To build the project run:
+## Theming and Styling
+- Global typography, gradient background, and component classes are defined in src/styles.css under Tailwind layers
+- Theme tokens (colors, spacing, shadows, animations) live in tailwind.config.js
+- Reusable classes: btn-primary, btn-secondary, btn-outline, card, input, scrollbar-thin
 
-```bash
-ng build
-```
+## Extensibility
+- Priorities: extend the priority palette and mapping in fishbone.component.ts
+- Export: customize sanitize/replaceForeignObjectsWithSVG for richer markup
+- Layout: tweak layoutConfig (angles, gaps, padding) for different aesthetics
+- Persistence: wire up import/restore from JSON to rehydrate DiagramData from storage
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Troubleshooting
+- Export blocked (SecurityError / tainted canvas): use the provided PNG/SVG/PDF buttons; the component already sanitizes and falls back to SVG
+- Missing labels or overlap: the layout engine runs after render; allow a brief moment or trigger a small window resize to reflow
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## License
+MIT
