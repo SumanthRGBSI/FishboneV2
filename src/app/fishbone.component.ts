@@ -785,20 +785,56 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
-      try {
-        // Attempt to read pixel to ensure non-tainted
-        ctx.getImageData(0, 0, 1, 1);
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png', 1.0);
-        a.download = 'fishbone-diagram.png';
-        a.click();
-      } catch {
-        // Fallback: download SVG instead
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'fishbone-diagram.svg';
-        a.click();
-      }
+      try { ctx.getImageData(0, 0, 1, 1); } catch { const a = document.createElement('a'); a.href = url; a.download = 'fishbone-diagram.svg'; a.click(); return; }
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png', 1.0);
+      a.download = 'fishbone-diagram.png';
+      a.click();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+
+  async exportPDF() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    this.replaceForeignObjectsWithSVG(clone);
+
+    const bbox = this.getContentBoundingBox();
+    const padding = 40;
+    const exportWidth = Math.round(bbox.width + padding * 2);
+    const exportHeight = Math.round(bbox.height + padding * 2);
+    clone.setAttribute('width', String(exportWidth));
+    clone.setAttribute('height', String(exportHeight));
+    clone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${exportWidth} ${exportHeight}`);
+
+    const style = document.createElement('style');
+    style.textContent = `svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }`;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); return; }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      try { ctx.getImageData(0, 0, 1, 1); } catch { const a = document.createElement('a'); a.href = url; a.download = 'fishbone-diagram.svg'; a.click(); return; }
+      const imgData = canvas.toDataURL('image/png');
+      const orientation = exportWidth > exportHeight ? 'l' : 'p';
+      const pdf = new jspdf.jsPDF({ orientation, unit: 'px', format: [exportWidth, exportHeight] });
+      pdf.addImage(imgData, 'PNG', 0, 0, exportWidth, exportHeight);
+      pdf.save('fishbone-diagram.pdf');
     };
     img.onerror = () => { URL.revokeObjectURL(url); };
     img.src = url;
