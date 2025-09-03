@@ -361,10 +361,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       this.raf1 = requestAnimationFrame(() => {
         this.raf2 = requestAnimationFrame(() => {
           try {
-            this.measureAllLabels();
-            this.recomputeCategoryXMap();
-            this.recomputeAngles();
-            this.computeCollisionOffsets();
+            this.runLayoutEngine();
             this.resetViewIfUnset();
           } catch (e) {
             console.warn("layout pass skipped due to error", e);
