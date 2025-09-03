@@ -313,6 +313,18 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   private categoryXMap: Record<string, number> = {};
   private categoryAngleMap: Record<string, number> = {};
 
+  // Grid layout configuration and state
+  private layoutConfig = {
+    levelPadding: 20,
+    horizontalPairGap: 80,
+    boneLengthBuffer: 60,
+    spineStartYOffset: 40,
+    connectorShelf: 10,
+    connectorGap: 5,
+  };
+  private topLevelYPositions: number[] = [];
+  private bottomLevelYPositions: number[] = [];
+
   // Pan and zoom viewBox
   viewX = 0;
   viewY = 0;
