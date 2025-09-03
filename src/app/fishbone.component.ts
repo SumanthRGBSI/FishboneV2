@@ -391,33 +391,22 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private recomputeCategoryXMap() {
-    const horizontalColumnGap = this.layoutConfig.horizontalPairGap;
-    let previousColumnEndX = this.spineStartX;
-    const maxLevels = this.diagram.categories.reduce((max, cat) => Math.max(max, cat.causes.length), 0);
+    let previousColumnEndX = this.layoutConfig.spineStartX;
 
     for (let i = 0; i < this.diagram.categories.length; i += 2) {
       const topCat = this.diagram.categories[i];
       const bottomCat = this.diagram.categories[i + 1];
 
-      let maxLabelWidthInCurrentColumn = 0;
-      for (let level = 0; level < maxLevels; level++) {
-        const topWidth = topCat?.causes[level]?.layout?.width || 0;
-        const bottomWidth = bottomCat?.causes[level]?.layout?.width || 0;
-        maxLabelWidthInCurrentColumn = Math.max(maxLabelWidthInCurrentColumn, topWidth, bottomWidth);
-      }
+      const labelSpace = this.layoutConfig.fixedCauseWidth;
+      const boneX = previousColumnEndX + labelSpace + this.layoutConfig.horizontalColumnGap;
 
-      const boneX = previousColumnEndX + maxLabelWidthInCurrentColumn + horizontalColumnGap;
       if (topCat) this.categoryXMap[topCat.id] = boneX;
       if (bottomCat) this.categoryXMap[bottomCat.id] = boneX;
 
-      const rightProj = (idx: number) => {
-        if (idx >= this.diagram.categories.length) return 0;
-        const length = this.getCategoryLength(idx);
-        const angle = Math.abs(this.getCategoryAngle(idx));
-        return Math.cos((angle * Math.PI) / 180) * length;
-      };
-      const proj = Math.max(rightProj(i), rightProj(i + 1));
-      previousColumnEndX = boneX + proj;
+      const angleRadians = (this.layoutConfig.boneAngle * Math.PI) / 180;
+      const topLen = topCat ? Math.cos(angleRadians) * this.getCategoryLength(i) : 0;
+      const botLen = bottomCat ? Math.cos(angleRadians) * this.getCategoryLength(i + 1) : 0;
+      previousColumnEndX = boneX + Math.max(topLen, botLen);
     }
   }
 
