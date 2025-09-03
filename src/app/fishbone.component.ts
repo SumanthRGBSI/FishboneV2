@@ -10,6 +10,8 @@ import {
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 
+declare const jspdf: any;
+
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
 interface Cause {
