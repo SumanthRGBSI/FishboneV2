@@ -753,10 +753,11 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   private approxCharWidth = 7;
   getLabelWidthFromText(text: string): number { return Math.min(Math.max(text.length * this.approxCharWidth + 16, 120), this.labelMaxWidth); }
 
-  private measureAllLabels() {
+  private measureAllLabels(): boolean {
     try {
       const svg = this.svgRef?.nativeElement;
-      if (!svg) return;
+      if (!svg) return false;
+      let allFound = true;
       for (const category of this.diagram.categories) {
         for (const cause of category.causes) {
           const el = svg.querySelector(`div.cause-box[data-cause-id="${cause.id}"]`) as HTMLElement | null;
@@ -764,11 +765,16 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
             const rect = el.getBoundingClientRect();
             const w = Math.min(Math.ceil(rect.width || 0), this.labelMaxWidth);
             if (w && w > 0) this.measuredLabelWidth[cause.id] = w;
+            cause.layout = { x: 0, y: 0, width: rect.width, height: rect.height };
+          } else {
+            allFound = false;
           }
         }
       }
+      return allFound;
     } catch (e) {
       console.warn("measureAllLabels failed", e);
+      return false;
     }
   }
   getCauseTextWidth(text: string): number { return this.getLabelWidthFromText(text); }
