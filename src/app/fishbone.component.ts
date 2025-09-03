@@ -426,10 +426,8 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getCategoryAngle(index: number): number {
-    const id = this.diagram.categories[index]?.id;
-    const a = id ? this.categoryAngleMap[id] : undefined;
-    if (typeof a === "number") return a;
-    return this.isTopSide(index) ? -45 : 45;
+    const angle = this.layoutConfig.boneAngle;
+    return this.isTopSide(index) ? -angle : angle;
   }
 
   diagram: DiagramData = { problemStatement: "", categories: [] };
