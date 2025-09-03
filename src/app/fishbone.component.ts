@@ -17,6 +17,12 @@ interface Cause {
   text: string;
   priority: Priority;
   subCauses: Cause[];
+  layout?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 interface Category {
