@@ -465,7 +465,15 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.diagram.categories.length === 0) return this.spineStartX;
     const lastIndex = this.diagram.categories.length - 1;
     const lastCat = this.diagram.categories[lastIndex];
-    const boneX = this.categoryXMap[lastCat.id] ?? this.getCategoryX(lastIndex);
+    // Avoid calling getCategoryX here to prevent recursive access via spineEndX
+    let boneX = this.categoryXMap[lastCat.id];
+    if (boneX == null) {
+      const col = Math.floor(lastIndex / 2);
+      const angleRad = (this.layoutConfig.boneAngle * Math.PI) / 180;
+      const projectedBase = Math.cos(angleRad) * 80;
+      const step = this.layoutConfig.fixedCauseWidth + this.layoutConfig.horizontalColumnGap + projectedBase;
+      boneX = this.layoutConfig.spineStartX + (col + 1) * step;
+    }
     const angle = Math.abs(this.getCategoryAngle(lastIndex));
     const horiz = Math.cos((angle * Math.PI) / 180) * this.getCategoryLength(lastIndex);
     return boneX + horiz;
