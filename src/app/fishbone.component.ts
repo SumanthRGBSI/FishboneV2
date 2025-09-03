@@ -172,7 +172,7 @@ interface DiagramData {
             <!-- Overlay pass: labels above all bones -->
             <g *ngFor="let category of diagram.categories; let i = index">
               <g *ngFor="let cause of category.causes; let j = index">
-                <foreignObject [attr.x]="getLabelLeftX(i, j, cause.text) - 3" [attr.y]="getLabelTopY(i, j, cause.text)" [attr.width]="getLabelWidth(i, j, cause.text) + 3" [attr.height]="getLabelHeight(i, j, cause.text)">
+                <foreignObject [attr.x]="((cause.layout?.x ?? getLabelLeftX(i, j, cause.text)) - 3)" [attr.y]="(cause.layout?.y ?? getLabelTopY(i, j, cause.text))" [attr.width]="(cause.layout?.width ?? getLabelWidth(i, j, cause.text)) + 3" [attr.height]="(cause.layout?.height ?? getLabelHeight(i, j, cause.text))">
                   <div xmlns="http://www.w3.org/1999/xhtml" class="cause-box" [attr.data-cause-id]="cause.id" [style.border-left]="'4px solid ' + priorityColors[cause.priority]" style="border:1px solid #E5E7EB;border-left-width:4px;border-radius:8px;padding:6px 8px;display:inline-block;background:#ffffff;box-shadow:0 4px 15px -2px rgba(0,0,0,0.05);transition:box-shadow 150ms ease, transform 150ms ease;">
                     <span class="cause-text" [class.clamped]="true" [style.max-width.px]="labelMaxWidth" [attr.title]="needsClamp(i, j, cause.text) ? cause.text : null">{{ cause.text }}</span>
                     <button type="button" class="ellipsis-btn" *ngIf="needsClamp(i, j, cause.text)" (mouseenter)="showTooltip($event, cause.text)" (mouseleave)="hideTooltip()" (focus)="showTooltip($event, cause.text)" (blur)="hideTooltip()">…</button>
