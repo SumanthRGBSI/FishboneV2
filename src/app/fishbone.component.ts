@@ -157,7 +157,7 @@ interface DiagramData {
 
               <!-- Category Causes: connectors -->
               <g *ngFor="let cause of category.causes; let j = index" (mouseenter)="hoveredCauseId = cause.id" (mouseleave)="hoveredCauseId = null">
-                <path [attr.d]="getOrthogonalConnectorPath(i, j, cause.text)" stroke="#6b7280" [attr.stroke-width]="hoveredCauseId === cause.id ? 2 : 1.5" stroke-linejoin="round" stroke-linecap="round" fill="none" />
+                <path [attr.d]="getOrthogonalCauseConnectorPath(i, cause, j)" stroke="#6b7280" [attr.stroke-width]="hoveredCauseId === cause.id ? 2 : 1.5" stroke-linejoin="round" stroke-linecap="round" fill="none" />
               </g>
 
               <!-- Delete Category Button (trash icon) -->
