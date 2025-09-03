@@ -562,6 +562,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       const index = this.diagram.categories.indexOf(category);
       if (index > -1) {
         this.diagram.categories.splice(index, 1);
+        this.runLayoutAfterRender();
       }
     }
   }
