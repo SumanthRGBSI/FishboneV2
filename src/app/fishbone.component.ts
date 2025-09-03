@@ -65,11 +65,13 @@ interface DiagramData {
                   </svg>
                   Export JSON
                 </button>
-                <button (click)="exportJPG()" class="btn-outline text-sm flex items-center">
-                  <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16l5-5 4 4 5-6 4 5M3 19h18" />
-                  </svg>
-                  Export JPG
+                <button (click)="exportSVG()" class="btn-outline text-sm flex items-center">
+                  <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3H6a2 2 0 00-2 2v14l4-4h6a2 2 0 002-2V5a2 2 0 00-2-2z"/></svg>
+                  Export SVG
+                </button>
+                <button (click)="exportPNG()" class="btn-outline text-sm flex items-center">
+                  <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16l5-5 4 4 5-6 4 5M3 19h18"/></svg>
+                  Export PNG
                 </button>
               </div>
             </div>
@@ -634,6 +636,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch {}
   }
 
+  // Legacy kept but not used
   exportJPG() {
     const svgEl = this.svgRef?.nativeElement;
     if (!svgEl) return;
@@ -699,6 +702,89 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     };
     img.onerror = () => fallbackDownloadSVG();
     img.src = svgDataUrl;
+  }
+
+  // Compute a content bounding box for export
+  private getContentBoundingBox() {
+    const x = 0;
+    const y = 0;
+    const width = this.canvasWidth;
+    const height = this.canvasHeight;
+    return { x, y, width, height };
+  }
+
+  async exportSVG() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+
+    const bbox = this.getContentBoundingBox();
+    const padding = 20;
+    clone.setAttribute('width', String(bbox.width + padding * 2));
+    clone.setAttribute('height', String(bbox.height + padding * 2));
+    clone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .cause-box { font-family: Inter, system-ui, sans-serif; font-size: 10px; line-height: 14px; color: #111827; background: #ffffff; border: 1px solid #E5E7EB; border-left-width: 4px; border-radius: 8px; padding: 6px 8px; display: inline-block; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); overflow-wrap: anywhere; word-break: break-word; }
+      .cause-text { overflow-wrap: anywhere; word-break: break-word; }
+      svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
+    `;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fishbone-diagram.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async exportPNG() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    const bbox = this.getContentBoundingBox();
+    const padding = 20;
+    const exportWidth = Math.round(bbox.width + padding * 2);
+    const exportHeight = Math.round(bbox.height + padding * 2);
+    clone.setAttribute('width', String(exportWidth));
+    clone.setAttribute('height', String(exportHeight));
+    clone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${exportWidth} ${exportHeight}`);
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .cause-box { font-family: Inter, system-ui, sans-serif; font-size: 10px; line-height: 14px; color: #111827; background: #ffffff; border: 1px solid #E5E7EB; border-left-width: 4px; border-radius: 8px; padding: 6px 8px; display: inline-block; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); overflow-wrap: anywhere; word-break: break-word; }
+      .cause-text { overflow-wrap: anywhere; word-break: break-word; }
+      svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
+    `;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); return; }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png', 1.0);
+      a.download = 'fishbone-diagram.png';
+      a.click();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); };
+    img.src = url;
   }
 
   // Level-Based Grid Layout Engine
