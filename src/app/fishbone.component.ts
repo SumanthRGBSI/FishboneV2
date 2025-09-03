@@ -119,7 +119,7 @@ interface DiagramData {
             <rect width="100%" height="100%" fill="url(#grid)" *ngIf="showGrid" />
 
             <!-- Main Spine (Dynamic length) -->
-            <line [attr.x1]="spineStartX" [attr.y1]="spineY" [attr.x2]="spineEndX" [attr.y2]="spineY" stroke="#374151" stroke-width="3" stroke-linecap="round" filter="url(#boneShadow)" />
+            <line [attr.x1]="spineStartX" [attr.y1]="spineY" [attr.x2]="spineEndX" [attr.y2]="spineY" stroke="#111827" stroke-width="4" stroke-linecap="round" />
 
             <!-- Problem Statement -->
             <text [attr.x]="problemBoxX + problemBoxWidth / 2" [attr.y]="spineY - 10" fill="#111827" font-size="18" font-weight="800" text-anchor="middle" dominant-baseline="baseline">
