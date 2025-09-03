@@ -308,6 +308,10 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Context menu state for causes
   openMenuForCauseId: string | null = null;
+  // Export dropdown state
+  isExportMenuOpen = false;
+  toggleExportMenu() { this.isExportMenuOpen = !this.isExportMenuOpen; }
+  closeExportMenu() { this.isExportMenuOpen = false; }
 
   // Sequential layout mapping
   private SAFE_MARGIN = 110;
