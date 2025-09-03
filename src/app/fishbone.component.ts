@@ -641,20 +641,32 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(svgEl);
 
+    // Remove all foreignObject nodes to avoid tainted canvas, and keep problem text
     const problemText = this.diagram.problemStatement || "Add Problem Statement";
     const textX = this.problemBoxX + this.problemBoxWidth / 2;
-    const textY = this.problemBoxY + this.problemBoxHeight / 2;
-    svgString = svgString.replace(/<foreignObject[\s\S]*?<\/foreignObject>/, `
-      <text x="${textX}" y="${textY}" fill="#ffffff" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle">
-        ${problemText.replace(/&/g, "&amp;").replace(/</g, "&lt;")}
-      </text>
-    `);
+    const textY = this.problemBoxY - 10; // place above spine
+    svgString = svgString.replace(/<foreignObject[\s\S]*?<\/foreignObject>/g, "");
+    svgString = svgString.replace(
+      /<text[^>]*>\s*.*?\s*<\/text>/,
+      `<text x="${textX}" y="${textY}" fill="#111827" font-size="18" font-weight="800" text-anchor="middle" dominant-baseline="baseline">${problemText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")}</text>`,
+    );
 
     const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const img = new Image();
+    img.crossOrigin = "anonymous";
     const width = this.canvasWidth;
     const height = this.canvasHeight;
+
+    const fallbackDownloadSVG = () => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "fishbone.svg";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
 
     img.onload = () => {
       const canvas = document.createElement("canvas");
@@ -665,23 +677,29 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
         URL.revokeObjectURL(url);
         return;
       }
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(
-        (b) => {
-          if (!b) return;
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(b);
-          a.download = "fishbone.jpg";
-          a.click();
-          URL.revokeObjectURL(a.href);
-        },
-        "image/jpeg",
-        0.95,
-      );
+      try {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(
+          (b) => {
+            if (!b) return fallbackDownloadSVG();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(b);
+            a.download = "fishbone.jpg";
+            a.click();
+            URL.revokeObjectURL(a.href);
+          },
+          "image/jpeg",
+          0.95,
+        );
+      } catch (e) {
+        // If canvas is tainted for any reason, fallback to downloading the SVG
+        fallbackDownloadSVG();
+      }
     };
+    img.onerror = () => fallbackDownloadSVG();
     img.src = url;
   }
 
