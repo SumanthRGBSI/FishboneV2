@@ -5,9 +5,12 @@ import {
   ViewChild,
   AfterViewInit,
   OnDestroy,
+  HostListener,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
+
+declare const jspdf: any;
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -16,6 +19,12 @@ interface Cause {
   text: string;
   priority: Priority;
   subCauses: Cause[];
+  layout?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 interface Category {
@@ -35,89 +44,113 @@ interface DiagramData {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="min-h-screen bg-neutral-50 p-4">
+    <div class="min-h-screen p-6">
       <!-- Header with controls -->
       <div class="max-w-full mx-auto mb-4">
-        <div
-          class="bg-white rounded-lg shadow-sm border border-neutral-200 p-4"
-        >
-          <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
-            <h1 class="text-xl font-bold text-neutral-900">
-              Interactive Fishbone Diagram
-            </h1>
-            <div class="flex items-center space-x-3">
-              <button (click)="resetDiagram()" class="btn-outline text-sm">
-                <svg
-                  class="w-3 h-3 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        <div class="card p-4">
+          <div class="flex flex-wrap justify-between items-center gap-6 mb-4">
+            <h1>Interactive Fishbone Diagram</h1>
+            <div class="flex items-center flex-wrap gap-6">
+              <div class="flex items-center gap-2">
+                <button
+                  (click)="resetDiagram()"
+                  class="btn-outline text-sm flex items-center"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  ></path>
-                </svg>
-                Reset
-              </button>
-              <button (click)="toggleGrid()" class="btn-outline text-sm">
-                Grid: {{ showGrid ? "ON" : "OFF" }}
-              </button>
-              <button (click)="exportData()" class="btn-primary text-sm">
-                <svg
-                  class="w-3 h-3 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  <svg
+                    class="w-5 h-5 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Reset
+                </button>
+              </div>
+              <div class="relative">
+                <button
+                  (click)="$event.stopPropagation(); toggleExportMenu()"
+                  class="btn-primary text-sm flex items-center"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  ></path>
-                </svg>
-                Export JSON
-              </button>
-              <button (click)="exportJPG()" class="btn-outline text-sm">
-                <svg
-                  class="w-3 h-3 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  <svg
+                    class="w-5 h-5 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Export
+                  <svg
+                    class="w-4 h-4 ml-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+                <div
+                  *ngIf="isExportMenuOpen"
+                  class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 z-10"
+                  (click)="$event.stopPropagation()"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M3 16l5-5 4 4 5-6 4 5M3 19h18"
-                  ></path>
-                </svg>
-                Export JPG
-              </button>
+                  <a
+                    (click)="exportData(); closeExportMenu()"
+                    class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+                    >Export as JSON</a
+                  >
+                  <a
+                    (click)="exportSVG(); closeExportMenu()"
+                    class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+                    >Export as SVG</a
+                  >
+                  <a
+                    (click)="exportPNG(); closeExportMenu()"
+                    class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+                    >Export as PNG</a
+                  >
+                  <a
+                    (click)="exportPDF(); closeExportMenu()"
+                    class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+                    >Export as PDF</a
+                  >
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-4">
-            <!-- Problem Statement Input -->
+          <div class="flex flex-wrap items-end gap-4">
+            <!-- Problem Statement Input styled as title -->
             <div class="flex-1 min-w-[300px]">
-              <label class="block text-sm font-medium text-neutral-700 mb-1"
-                >Problem Statement:</label
-              >
               <input
                 type="text"
                 [(ngModel)]="diagram.problemStatement"
-                placeholder="Enter the problem you want to analyze..."
-                class="input w-full"
+                placeholder="Click here to define the core problem."
+                class="input w-full text-xl md:text-2xl font-semibold py-3 px-4 focus:ring-2 focus:ring-primary-300"
               />
             </div>
 
             <!-- Add Category Button -->
-            <button (click)="addCategory()" class="btn-secondary mt-5">
+            <button
+              (click)="addCategory()"
+              class="btn-primary mt-1 flex items-center"
+            >
               <svg
-                class="w-4 h-4 mr-2"
+                class="w-5 h-5 mr-2"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -126,8 +159,8 @@ interface DiagramData {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                ></path>
+                  d="M12 6v12m6-6H6"
+                />
               </svg>
               Add Category
             </button>
@@ -175,39 +208,53 @@ interface DiagramData {
       <!-- Dynamic Fishbone Diagram Canvas -->
       <div class="max-w-full mx-auto">
         <div
-          class="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-x-auto fishbone-wrapper"
+          class="bg-white rounded-lg shadow-card border border-neutral-200 overflow-x-auto fishbone-wrapper relative"
           [style.min-height.px]="canvasHeight"
         >
+          <!-- Zoom/Pan overlay controls -->
+          <div class="absolute right-3 top-3 z-10 flex flex-col gap-2">
+            <button class="btn-secondary w-9 h-9 p-0" (click)="zoomIn()">
+              +
+            </button>
+            <button class="btn-secondary w-9 h-9 p-0" (click)="zoomOut()">
+              −
+            </button>
+            <button class="btn-outline w-9 h-9 p-0" (click)="resetView()">
+              ⤾
+            </button>
+          </div>
+
           <svg
             #diagramSvg
             [attr.width]="canvasWidth"
             [attr.height]="canvasHeight"
-            [attr.viewBox]="'0 0 ' + canvasWidth + ' ' + canvasHeight"
+            [attr.viewBox]="viewX + ' ' + viewY + ' ' + viewW + ' ' + viewH"
             class="min-w-full h-full"
             (click)="clearFocus()"
+            (wheel)="onWheel($event)"
+            (mousedown)="onMouseDown($event)"
+            (mousemove)="onMouseMove($event)"
+            (mouseleave)="onMouseUp()"
+            (mouseup)="onMouseUp()"
           >
-            <!-- Background Grid -->
             <defs>
-              <pattern
-                id="grid"
-                width="20"
-                height="20"
-                patternUnits="userSpaceOnUse"
+              <!-- Subtle drop shadow for bones -->
+              <filter
+                id="boneShadow"
+                x="-20%"
+                y="-20%"
+                width="140%"
+                height="140%"
               >
-                <path
-                  d="M 20 0 L 0 0 0 20"
-                  fill="none"
-                  stroke="#f3f4f6"
-                  stroke-width="0.5"
+                <feDropShadow
+                  dx="0"
+                  dy="1"
+                  stdDeviation="1"
+                  flood-color="#000000"
+                  flood-opacity="0.08"
                 />
-              </pattern>
+              </filter>
             </defs>
-            <rect
-              width="100%"
-              height="100%"
-              fill="url(#grid)"
-              *ngIf="showGrid"
-            />
 
             <!-- Main Spine (Dynamic length) -->
             <line
@@ -215,18 +262,18 @@ interface DiagramData {
               [attr.y1]="spineY"
               [attr.x2]="spineEndX"
               [attr.y2]="spineY"
-              stroke="#374151"
-              stroke-width="3"
+              stroke="#111827"
+              stroke-width="4"
               stroke-linecap="round"
             />
 
-            <!-- Problem Statement (typography-forward) -->
+            <!-- Problem Statement -->
             <text
               [attr.x]="problemBoxX + problemBoxWidth / 2"
               [attr.y]="spineY - 10"
               fill="#111827"
-              font-size="16"
-              font-weight="700"
+              font-size="18"
+              font-weight="800"
               text-anchor="middle"
               dominant-baseline="baseline"
             >
@@ -240,7 +287,7 @@ interface DiagramData {
               [style.opacity]="
                 !focusedCategoryId || focusedCategoryId === category.id
                   ? 1
-                  : 0.2
+                  : 0.15
               "
               (click)="setFocus(category, $event)"
             >
@@ -254,6 +301,7 @@ interface DiagramData {
                 stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                filter="url(#boneShadow)"
               />
 
               <!-- Category Title -->
@@ -271,89 +319,108 @@ interface DiagramData {
               </text>
 
               <!-- Add Cause Button -->
-              <circle
-                [attr.cx]="getCategoryEndX(i)"
-                [attr.cy]="getCategoryEndY(i)"
-                r="10"
-                [attr.fill]="getTint(category.color, 0.2)"
-                [attr.stroke]="category.color"
-                stroke-width="1.5"
+              <g
                 class="cursor-pointer hover:opacity-80"
                 (click)="addCause(category)"
-              />
-              <text
-                [attr.x]="getCategoryEndX(i)"
-                [attr.y]="getCategoryEndY(i)"
-                [attr.fill]="category.color"
-                font-size="14"
-                font-weight="700"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                class="cursor-pointer pointer-events-none"
               >
-                +
-              </text>
+                <circle
+                  [attr.cx]="getCategoryEndX(i)"
+                  [attr.cy]="getCategoryEndY(i)"
+                  r="10"
+                  [attr.fill]="getTint(category.color, 0.2)"
+                  [attr.stroke]="category.color"
+                  stroke-width="1.5"
+                />
+                <path
+                  [attr.d]="
+                    'M ' +
+                    getCategoryEndX(i) +
+                    ' ' +
+                    (getCategoryEndY(i) - 4) +
+                    ' v 8 M ' +
+                    (getCategoryEndX(i) - 4) +
+                    ' ' +
+                    getCategoryEndY(i) +
+                    ' h 8'
+                  "
+                  [attr.stroke]="category.color"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </g>
 
-              <!-- Category Causes: draw only connectors here -->
+              <!-- Category Causes: connectors -->
               <g
                 *ngFor="let cause of category.causes; let j = index"
                 (mouseenter)="hoveredCauseId = cause.id"
                 (mouseleave)="hoveredCauseId = null"
               >
-                <!-- Connector: outward riser then left shelf -->
                 <path
-                  [attr.d]="getCauseConnectorPath(i, j, cause.text)"
+                  [attr.d]="getOrthogonalCauseConnectorPath(i, cause, j)"
                   stroke="#6b7280"
                   [attr.stroke-width]="hoveredCauseId === cause.id ? 2 : 1.5"
                   stroke-linejoin="round"
-                  stroke-linecap="butt"
+                  stroke-linecap="round"
                   fill="none"
                 />
               </g>
 
-              <!-- Delete Category Button -->
-              <circle
-                [attr.cx]="getCategoryTextX(i) + 40"
-                [attr.cy]="getCategoryTextY(i)"
-                r="10"
-                fill="#ef4444"
+              <!-- Delete Category Button (trash icon) -->
+              <g
                 class="cursor-pointer hover:opacity-75"
                 (click)="deleteCategory(category)"
-              />
-              <text
-                [attr.x]="getCategoryTextX(i) + 40"
-                [attr.y]="getCategoryTextY(i)"
-                fill="white"
-                font-size="12"
-                font-weight="bold"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                class="cursor-pointer pointer-events-none"
               >
-                ×
-              </text>
+                <circle
+                  [attr.cx]="getCategoryTextX(i) + 40"
+                  [attr.cy]="getCategoryTextY(i)"
+                  r="10"
+                  [attr.fill]="getTint('#ef4444', 0.9)"
+                />
+                <svg
+                  [attr.x]="getCategoryTextX(i) + 34"
+                  [attr.y]="getCategoryTextY(i) - 6"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <path
+                    d="M19 7l-1 12a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7m3 0V5a2 2 0 012-2h4a2 2 0 012 2v2m-9 0h10"
+                    stroke="white"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </g>
             </g>
 
             <!-- Overlay pass: labels above all bones -->
             <g *ngFor="let category of diagram.categories; let i = index">
               <g *ngFor="let cause of category.causes; let j = index">
                 <foreignObject
-                  [attr.x]="getLabelLeftX(i, j, cause.text) - 3"
-                  [attr.y]="getLabelTopY(i, j, cause.text)"
-                  [attr.width]="getLabelWidth(i, j, cause.text) + 3"
-                  [attr.height]="getLabelHeight(i, j, cause.text)"
+                  [attr.x]="
+                    (cause.layout?.x ?? getLabelLeftX(i, j, cause.text)) - 3
+                  "
+                  [attr.y]="cause.layout?.y ?? getLabelTopY(i, j, cause.text)"
+                  [attr.width]="
+                    (cause.layout?.width ?? getLabelWidth(i, j, cause.text)) + 3
+                  "
+                  [attr.height]="
+                    cause.layout?.height ?? getLabelHeight(i, j, cause.text)
+                  "
                 >
                   <div
                     xmlns="http://www.w3.org/1999/xhtml"
-                    class="cause-box"
+                    class="cause-box w-60"
                     [attr.data-cause-id]="cause.id"
                     [style.border-left]="
-                      '3px solid ' + priorityColors[cause.priority]
+                      '4px solid ' + priorityColors[cause.priority]
                     "
-                    style="border:1px solid #E0E0E0;border-left-width:3px;border-radius:4px;padding:2px 6px;display:inline-block;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.06);"
+                    style="border:1px solid #E5E7EB;border-left-width:4px;border-radius:8px;padding:6px 8px;display:inline-block;background:#ffffff;box-shadow:0 4px 15px -2px rgba(0,0,0,0.05);transition:box-shadow 150ms ease, transform 150ms ease;"
                   >
                     <span
-                      class="cause-text"
+                      class="cause-text break-words"
                       [class.clamped]="true"
                       [style.max-width.px]="labelMaxWidth"
                       [attr.title]="
@@ -374,20 +441,34 @@ interface DiagramData {
                     </button>
                   </div>
                 </foreignObject>
-                <text
-                  [attr.x]="getLabelRightX(i, j, cause.text) - 4"
-                  [attr.y]="getLabelY(i, j, cause.text)"
-                  fill="#ef4444"
-                  font-size="12"
-                  font-weight="700"
-                  text-anchor="middle"
-                  dominant-baseline="middle"
-                  class="cursor-pointer"
+                <!-- Delete cause icon (trash) -->
+                <svg
+                  [attr.x]="
+                    (cause.layout?.x ?? getLabelLeftX(i, j, cause.text)) +
+                    (cause.layout?.width ?? getLabelWidth(i, j, cause.text)) -
+                    10
+                  "
+                  [attr.y]="
+                    (cause.layout?.y ?? getLabelTopY(i, j, cause.text)) +
+                    (cause.layout?.height ?? getLabelHeight(i, j, cause.text)) /
+                      2 -
+                    6
+                  "
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
                   [attr.opacity]="hoveredCauseId === cause.id ? 1 : 0"
+                  class="cursor-pointer"
                   (click)="deleteCause(category, cause)"
                 >
-                  ×
-                </text>
+                  <path
+                    d="M19 7l-1 12a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7m3 0V5a2 2 0 012-2h4a2 2 0 012 2v2m-9 0h10"
+                    stroke="#ef4444"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
               </g>
             </g>
           </svg>
@@ -397,7 +478,7 @@ interface DiagramData {
       <!-- Full-text Popover -->
       <div
         *ngIf="tooltipVisible"
-        class="popover"
+        class="popover animate-fade-in"
         [style.left.px]="tooltipX"
         [style.top.px]="tooltipY"
         role="tooltip"
@@ -410,74 +491,109 @@ interface DiagramData {
         class="max-w-full mx-auto mt-4"
         *ngIf="diagram.categories.length > 0"
       >
-        <div
-          class="bg-white rounded-lg shadow-sm border border-neutral-200 p-4"
-        >
-          <h2 class="text-lg font-semibold text-neutral-900 mb-3">
-            Categories & Causes
-          </h2>
+        <div class="card p-4">
+          <h2 class="mb-3">Categories & Causes</h2>
           <div
-            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6"
           >
             <div
               *ngFor="let category of diagram.categories"
-              class="border border-neutral-200 rounded-lg p-3"
+              class="border border-neutral-200 rounded-lg p-4 shadow-soft-lift bg-white"
             >
-              <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center justify-between mb-3">
                 <h3
-                  class="font-medium text-sm truncate"
+                  class="text-base font-bold truncate"
                   [style.color]="category.color"
                 >
                   {{ category.title }}
                 </h3>
                 <button
                   (click)="addCause(category)"
-                  class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded"
+                  class="btn-secondary text-xs flex items-center px-2 py-1"
                 >
-                  +
+                  <svg
+                    class="w-4 h-4 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 6v12m6-6H6"
+                    />
+                  </svg>
+                  Add
                 </button>
               </div>
               <div class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
                 <div
                   *ngFor="let cause of category.causes"
-                  class="text-xs flex items-center justify-between group p-1 rounded"
+                  class="text-xs flex items-center justify-between group p-2 rounded relative odd:bg-neutral-50"
                   [style.background-color]="
-                    priorityColors[cause.priority] + '20'
+                    priorityColors[cause.priority] + '14'
                   "
                 >
                   <div class="flex items-center flex-1 min-w-0">
                     <div
-                      class="w-2 h-2 rounded-full mr-1 flex-shrink-0"
+                      class="w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0"
                       [style.background-color]="priorityColors[cause.priority]"
                     ></div>
                     <span
-                      class="cursor-pointer truncate text-neutral-700"
+                      class="cursor-pointer text-neutral-700 line-clamp-2"
                       (click)="editCause(cause)"
                       [title]="cause.text + ' (' + cause.priority + ')'"
                     >
-                      {{ getTruncatedText(cause.text, 15) }}
+                      {{ cause.text }}
                     </span>
                   </div>
-                  <div class="flex items-center space-x-1 ml-1">
+                  <div class="flex items-center space-x-1 ml-2">
                     <span
-                      class="text-xs font-medium px-1 rounded text-white"
+                      class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
                       [style.background-color]="priorityColors[cause.priority]"
                     >
                       {{ cause.priority.charAt(0) }}
                     </span>
                     <button
-                      (click)="deleteCause(category, cause)"
-                      class="text-xs text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      class="text-neutral-600 hover:text-neutral-900 p-1 rounded hover:bg-neutral-100"
+                      (click)="toggleCauseMenu(cause, $event)"
                     >
-                      ×
+                      <svg
+                        class="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
+                      </svg>
                     </button>
+                    <div
+                      *ngIf="openMenuForCauseId === cause.id"
+                      class="absolute right-2 top-7 z-10 bg-white border border-neutral-200 rounded-md shadow-card p-1"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <button
+                        class="flex items-center w-full text-left text-[12px] px-2 py-1 rounded hover:bg-neutral-50"
+                        (click)="editCause(cause); closeCauseMenu()"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="flex items-center w-full text-left text-[12px] text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                        (click)="deleteCause(category, cause); closeCauseMenu()"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div
                   *ngIf="category.causes.length === 0"
                   class="text-xs text-neutral-400 italic"
                 >
-                  Click + to add causes
+                  Click Add to create causes
                 </div>
               </div>
             </div>
@@ -488,9 +604,18 @@ interface DiagramData {
       <!-- Add Cause Modal -->
       <div
         *ngIf="showAddCauseModal"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        class="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50"
+        (click)="cancelAddCause()"
+        (keydown.escape)="cancelAddCause()"
       >
-        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div
+          #modalRef
+          class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-modal animate-slide-up animate-fade-in"
+          (click)="$event.stopPropagation()"
+          tabindex="-1"
+          aria-modal="true"
+          role="dialog"
+        >
           <h3 class="text-lg font-semibold text-neutral-900 mb-4">
             Add New Cause
           </h3>
@@ -513,25 +638,31 @@ interface DiagramData {
             <label class="block text-sm font-medium text-neutral-700 mb-2"
               >Priority Level:</label
             >
-            <div class="grid grid-cols-2 gap-2">
-              <button
+            <div
+              class="inline-flex items-center rounded-lg border border-neutral-300 overflow-hidden"
+            >
+              <label
                 *ngFor="let priority of priorities"
-                (click)="selectedPriority = priority"
-                class="flex items-center justify-center p-3 rounded-lg border-2 transition-all"
-                [class.border-neutral-300]="selectedPriority !== priority"
-                [class.border-blue-500]="selectedPriority === priority"
+                class="px-3 py-1.5 text-sm cursor-pointer select-none"
+                [class.font-semibold]="selectedPriority === priority"
                 [style.background-color]="
                   selectedPriority === priority
-                    ? priorityColors[priority] + '20'
-                    : 'white'
+                    ? getTint(priorityColors[priority], 0.12)
+                    : 'transparent'
                 "
+                [style.color]="
+                  selectedPriority === priority ? '#111827' : '#374151'
+                "
+                (click)="selectedPriority = priority"
               >
-                <div
-                  class="w-3 h-3 rounded mr-2"
-                  [style.background-color]="priorityColors[priority]"
-                ></div>
-                <span class="text-sm font-medium">{{ priority }}</span>
-              </button>
+                <span class="inline-flex items-center"
+                  ><span
+                    class="w-2.5 h-2.5 rounded-full mr-2"
+                    [style.background-color]="priorityColors[priority]"
+                  ></span
+                  >{{ priority }}</span
+                >
+              </label>
             </div>
           </div>
 
@@ -553,23 +684,11 @@ interface DiagramData {
   `,
   styles: [
     `
-      .btn-primary {
-        @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-2 rounded-lg transition-colors duration-200;
-      }
-      .btn-secondary {
-        @apply bg-neutral-100 hover:bg-neutral-200 text-neutral-900 font-medium px-3 py-2 rounded-lg transition-colors duration-200;
-      }
-      .btn-outline {
-        @apply border border-neutral-300 hover:border-neutral-400 text-neutral-700 font-medium px-3 py-2 rounded-lg transition-colors duration-200;
-      }
-      .input {
-        @apply block w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm placeholder-neutral-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500;
-      }
       svg text {
         user-select: none;
       }
       .cursor-pointer:hover {
-        opacity: 0.8;
+        opacity: 0.9;
       }
       .overflow-y-auto {
         scrollbar-width: thin;
@@ -587,14 +706,14 @@ interface DiagramData {
         border-radius: 2px;
       }
       .btn-primary:disabled {
-        @apply bg-neutral-400 cursor-not-allowed;
+        background-color: #a3a3a3;
+        cursor: not-allowed;
       }
-
       .cause-box {
         font-size: 10px;
         line-height: 14px;
         color: #111827;
-        background: #ffffff; /* opaque to hide underlying lines */
+        background: #ffffff;
         max-width: 300px;
       }
       .cause-text {
@@ -646,9 +765,13 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   focusedCategoryId: string | null = null;
   expandedCauses = new Set<string>();
   @ViewChild("diagramSvg") svgRef!: ElementRef<SVGSVGElement>;
+  @ViewChild("causeInput") causeInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild("modalRef") modalRef?: ElementRef<HTMLDivElement>;
 
-  // Measurement cache
+  // Measurement cache and offsets
   private measuredLabelWidth: Record<string, number> = {};
+  private yOffsets: Record<string, number> = {};
+
   private raf1: number | null = null;
   private raf2: number | null = null;
   private resizeObserver?: ResizeObserver;
@@ -660,11 +783,50 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   tooltipX = 0;
   tooltipY = 0;
 
+  // Context menu state for causes
+  openMenuForCauseId: string | null = null;
+  // Export dropdown state
+  isExportMenuOpen = false;
+  toggleExportMenu() {
+    this.isExportMenuOpen = !this.isExportMenuOpen;
+  }
+  closeExportMenu() {
+    this.isExportMenuOpen = false;
+  }
+
   // Sequential layout mapping
   private SAFE_MARGIN = 110;
   private INITIAL_X = 140;
   private LABEL_LEFT_PADDING = 16;
   private categoryXMap: Record<string, number> = {};
+  private categoryAngleMap: Record<string, number> = {};
+
+  // Grid layout configuration and state
+  private layoutConfig = {
+    fixedCauseWidth: 240, // Tailwind w-60 (15rem)
+    levelPadding: 15,
+    horizontalColumnGap: 40,
+    spineStartX: 80,
+    problemStatementWidth: 200,
+    problemStatementGap: 50,
+    boneAngle: 45,
+    spineStartYOffset: 40,
+    connectorShelf: 10,
+    connectorGap: 5,
+  };
+  private topLevelYPositions: number[] = [];
+  private bottomLevelYPositions: number[] = [];
+
+  // Pan and zoom viewBox
+  viewX = 0;
+  viewY = 0;
+  viewW = 0;
+  viewH = 0;
+  private isPanning = false;
+  private panStartX = 0;
+  private panStartY = 0;
+  private viewStartX = 0;
+  private viewStartY = 0;
 
   setFocus(category: Category, ev: MouseEvent) {
     ev.stopPropagation();
@@ -691,8 +853,8 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       this.raf1 = requestAnimationFrame(() => {
         this.raf2 = requestAnimationFrame(() => {
           try {
-            this.measureAllLabels();
-            this.recomputeCategoryXMap();
+            this.runLayoutEngine();
+            this.resetViewIfUnset();
           } catch (e) {
             console.warn("layout pass skipped due to error", e);
           }
@@ -721,56 +883,52 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private recomputeCategoryXMap() {
-    // Dynamic spacing per pair using measured label widths and cause counts
-    const newMap: Record<string, number> = {};
-    const count = this.diagram.categories.length;
-    const pairs = Math.ceil(count / 2);
-    let prevRight = this.spineStartX; // absolute x of rightmost rendered footprint
-    let baseline = this.spineStartX + this.INITIAL_X;
-    const tipPad = 20; // extra at bone tip/+ button
+    let previousColumnEndX = this.layoutConfig.spineStartX;
 
-    for (let p = 0; p < pairs; p++) {
-      const topIdx = p * 2;
-      const botIdx = topIdx + 1;
+    for (let i = 0; i < this.diagram.categories.length; i += 2) {
+      const topCat = this.diagram.categories[i];
+      const bottomCat = this.diagram.categories[i + 1];
 
-      const leftExtTop =
-        topIdx < count
-          ? this.getMaxLabelWidth(topIdx) + this.LABEL_LEFT_PADDING
-          : 0;
-      const leftExtBot =
-        botIdx < count
-          ? this.getMaxLabelWidth(botIdx) + this.LABEL_LEFT_PADDING
-          : 0;
-      const maxLeftExt = Math.max(leftExtTop, leftExtBot);
+      const labelSpace = this.layoutConfig.fixedCauseWidth;
+      const boneX =
+        previousColumnEndX + labelSpace + this.layoutConfig.horizontalColumnGap;
 
-      const rightFoot = (idx: number) => {
-        if (idx >= count) return 0;
-        const length = this.getCategoryLength(idx);
-        const bone = Math.cos((45 * Math.PI) / 180) * length;
-        return bone + tipPad;
-      };
-      const maxRightExt = Math.max(rightFoot(topIdx), rightFoot(botIdx));
+      if (topCat) this.categoryXMap[topCat.id] = boneX;
+      if (bottomCat) this.categoryXMap[bottomCat.id] = boneX;
 
-      const startX = Math.max(
-        baseline,
-        prevRight + this.SAFE_MARGIN + maxLeftExt,
-      );
-
-      if (topIdx < count) newMap[this.diagram.categories[topIdx].id] = startX;
-      if (botIdx < count) newMap[this.diagram.categories[botIdx].id] = startX;
-
-      prevRight = startX + maxRightExt;
-      baseline = prevRight; // next pair starts from current rightmost
+      const angleRadians = (this.layoutConfig.boneAngle * Math.PI) / 180;
+      const topLen = topCat
+        ? Math.cos(angleRadians) * this.getCategoryLength(i)
+        : 0;
+      const botLen = bottomCat
+        ? Math.cos(angleRadians) * this.getCategoryLength(i + 1)
+        : 0;
+      previousColumnEndX = boneX + Math.max(topLen, botLen);
     }
-
-    this.categoryXMap = newMap;
   }
-  diagram: DiagramData = {
-    problemStatement: "",
-    categories: [],
-  };
 
-  showGrid = false;
+  private recomputeAngles() {
+    const map: Record<string, number> = {};
+    for (let i = 0; i < this.diagram.categories.length; i++) {
+      const cat = this.diagram.categories[i];
+      const complexity = this.getCategoryTotalHeight(i);
+      const minAngle = 35;
+      const maxAngle = 70;
+      const base = 45;
+      const t = Math.max(0, Math.min(1, (complexity - 120) / 240));
+      const angle = base + (maxAngle - base) * t; // 45..70
+      map[cat.id] = this.isTopSide(i) ? -angle : angle;
+    }
+    this.categoryAngleMap = map;
+  }
+
+  private getCategoryAngle(index: number): number {
+    const angle = this.layoutConfig.boneAngle;
+    return this.isTopSide(index) ? -angle : angle;
+  }
+
+  diagram: DiagramData = { problemStatement: "", categories: [] };
+
   showAddCauseModal = false;
   newCauseText = "";
   selectedPriority: Priority = "Medium";
@@ -779,10 +937,10 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
 
   priorityColors = {
-    Critical: "#dc2626", // Red-600
-    High: "#ea580c", // Orange-600
-    Medium: "#ca8a04", // Yellow-600
-    Low: "#16a34a", // Green-600
+    Critical: "#dc2626",
+    High: "#ea580c",
+    Medium: "#ca8a04",
+    Low: "#16a34a",
   };
 
   private readonly categoryColors = [
@@ -799,39 +957,42 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   // Dynamic canvas dimensions
-  get canvasWidth(): number {
-    const minWidth = 520;
-    const count = this.diagram.categories.length;
-    const pairs = Math.ceil(Math.max(count, 2) / 2);
-    let prevRight = this.spineStartX;
-    let baseline = this.spineStartX + this.INITIAL_X;
-    const tipPad = 28;
-    for (let p = 0; p < pairs; p++) {
-      const topIdx = p * 2;
-      const botIdx = topIdx + 1;
-      const leftExt = Math.max(
-        topIdx < count
-          ? this.getMaxLabelWidth(topIdx) + this.LABEL_LEFT_PADDING
-          : 0,
-        botIdx < count
-          ? this.getMaxLabelWidth(botIdx) + this.LABEL_LEFT_PADDING
-          : 0,
-      );
-      const rightExt = Math.max(
-        topIdx < count
-          ? Math.cos((45 * Math.PI) / 180) * this.getCategoryLength(topIdx) +
-              tipPad
-          : 0,
-        botIdx < count
-          ? Math.cos((45 * Math.PI) / 180) * this.getCategoryLength(botIdx) +
-              tipPad
-          : 0,
-      );
-      const startX = Math.max(baseline, prevRight + this.SAFE_MARGIN + leftExt);
-      prevRight = startX + rightExt;
-      baseline = prevRight;
+  get lastBoneEndX(): number {
+    if (this.diagram.categories.length === 0) return this.spineStartX;
+    const lastIndex = this.diagram.categories.length - 1;
+    const lastCat = this.diagram.categories[lastIndex];
+    // Avoid calling getCategoryX here to prevent recursive access via spineEndX
+    let boneX = this.categoryXMap[lastCat.id];
+    if (boneX == null) {
+      const col = Math.floor(lastIndex / 2);
+      const angleRad = (this.layoutConfig.boneAngle * Math.PI) / 180;
+      const projectedBase = Math.cos(angleRad) * 80;
+      const step =
+        this.layoutConfig.fixedCauseWidth +
+        this.layoutConfig.horizontalColumnGap +
+        projectedBase;
+      boneX = this.layoutConfig.spineStartX + (col + 1) * step;
     }
-    return Math.max(minWidth, prevRight + 260);
+    const angle = Math.abs(this.getCategoryAngle(lastIndex));
+    const horiz =
+      Math.cos((angle * Math.PI) / 180) * this.getCategoryLength(lastIndex);
+    return boneX + horiz;
+  }
+
+  get spineEndX(): number {
+    return this.lastBoneEndX + this.layoutConfig.problemStatementGap;
+  }
+
+  get problemBoxX(): number {
+    return this.spineEndX + 20;
+  }
+
+  get problemBoxWidth(): number {
+    return this.layoutConfig.problemStatementWidth;
+  }
+
+  get canvasWidth(): number {
+    return this.problemBoxX + this.layoutConfig.problemStatementWidth + 40;
   }
 
   get canvasHeight(): number {
@@ -857,29 +1018,14 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get spineStartX(): number {
-    return 80;
+    return this.layoutConfig.spineStartX;
   }
-
-  get spineEndX(): number {
-    return this.canvasWidth - 250;
-  }
-
   get spineY(): number {
     return this.canvasHeight / 2;
   }
-
-  get problemBoxX(): number {
-    return this.spineEndX + 20;
-  }
-
   get problemBoxY(): number {
     return this.spineY - 40;
   }
-
-  get problemBoxWidth(): number {
-    return 200;
-  }
-
   get problemBoxHeight(): number {
     return 80;
   }
@@ -937,6 +1083,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       const index = this.diagram.categories.indexOf(category);
       if (index > -1) {
         this.diagram.categories.splice(index, 1);
+        this.runLayoutAfterRender();
       }
     }
   }
@@ -946,6 +1093,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     this.newCauseText = "";
     this.selectedPriority = "Medium";
     this.showAddCauseModal = true;
+    setTimeout(() => this.causeInputRef?.nativeElement?.focus(), 0);
   }
 
   confirmAddCause() {
@@ -973,6 +1121,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const newText = prompt("Edit cause description:", cause.text);
     if (newText && newText.trim()) {
       cause.text = newText.trim();
+      this.runLayoutAfterRender();
     }
   }
 
@@ -981,21 +1130,15 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       const index = category.causes.indexOf(cause);
       if (index > -1) {
         category.causes.splice(index, 1);
+        this.runLayoutAfterRender();
       }
     }
   }
 
   resetDiagram() {
     if (confirm("Reset the entire diagram? This cannot be undone.")) {
-      this.diagram = {
-        problemStatement: "",
-        categories: [],
-      };
+      this.diagram = { problemStatement: "", categories: [] };
     }
-  }
-
-  toggleGrid() {
-    this.showGrid = !this.showGrid;
   }
 
   exportData() {
@@ -1018,6 +1161,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch {}
   }
 
+  // Legacy kept but not used
   exportJPG() {
     const svgEl = this.svgRef?.nativeElement;
     if (!svgEl) return;
@@ -1025,53 +1169,399 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(svgEl);
 
-    // Replace foreignObject with pure SVG text for export safety
+    // Remove all foreignObject nodes to avoid tainted canvas, and keep problem text
     const problemText =
       this.diagram.problemStatement || "Add Problem Statement";
     const textX = this.problemBoxX + this.problemBoxWidth / 2;
-    const textY = this.problemBoxY + this.problemBoxHeight / 2;
+    const textY = this.problemBoxY - 10; // place above spine
     svgString = svgString.replace(
-      /<foreignObject[\s\S]*?<\/foreignObject>/,
-      `
-      <text x="${textX}" y="${textY}" fill="#ffffff" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle">
-        ${problemText.replace(/&/g, "&amp;").replace(/</g, "&lt;")}
-      </text>
-    `,
+      /<foreignObject[\s\S]*?<\/foreignObject>/g,
+      "",
+    );
+    svgString = svgString.replace(
+      /<text[^>]*>\s*.*?\s*<\/text>/,
+      `<text x="${textX}" y="${textY}" fill="#111827" font-size="18" font-weight="800" text-anchor="middle" dominant-baseline="baseline">${problemText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")}</text>`,
     );
 
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+    const svgDataUrl =
+      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
     const img = new Image();
+    img.crossOrigin = "anonymous";
     const width = this.canvasWidth;
     const height = this.canvasHeight;
+
+    const fallbackDownloadSVG = () => {
+      const blob = new Blob([svgString], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "fishbone.svg";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
 
     img.onload = () => {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
+      if (!ctx) return fallbackDownloadSVG();
+      try {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        // Detect tainted canvas early
+        try {
+          ctx.getImageData(0, 0, 1, 1);
+        } catch {
+          return fallbackDownloadSVG();
+        }
+        try {
+          canvas.toBlob(
+            (b) => {
+              if (!b) return fallbackDownloadSVG();
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(b);
+              a.download = "fishbone.jpg";
+              a.click();
+              URL.revokeObjectURL(a.href);
+            },
+            "image/jpeg",
+            0.95,
+          );
+        } catch {
+          fallbackDownloadSVG();
+        }
+      } catch {
+        fallbackDownloadSVG();
+      }
+    };
+    img.onerror = () => fallbackDownloadSVG();
+    img.src = svgDataUrl;
+  }
+
+  // Compute a content bounding box for export
+  private getContentBoundingBox() {
+    const x = 0;
+    const y = 0;
+    const width = this.canvasWidth;
+    const height = this.canvasHeight;
+    return { x, y, width, height };
+  }
+
+  async exportSVG() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+
+    // Replace foreignObject with pure SVG for portability
+    this.replaceForeignObjectsWithSVG(clone);
+
+    const bbox = this.getContentBoundingBox();
+    const padding = 20;
+    clone.setAttribute("width", String(bbox.width + padding * 2));
+    clone.setAttribute("height", String(bbox.height + padding * 2));
+    clone.setAttribute(
+      "viewBox",
+      `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`,
+    );
+
+    const style = document.createElement("style");
+    style.textContent = `
+      svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
+    `;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fishbone-diagram.svg";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async exportPNG() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    // Ensure no foreignObject remains to avoid tainting canvas
+    this.replaceForeignObjectsWithSVG(clone);
+
+    const bbox = this.getContentBoundingBox();
+    const padding = 20;
+    const exportWidth = Math.round(bbox.width + padding * 2);
+    const exportHeight = Math.round(bbox.height + padding * 2);
+    clone.setAttribute("width", String(exportWidth));
+    clone.setAttribute("height", String(exportHeight));
+    clone.setAttribute(
+      "viewBox",
+      `${bbox.x - padding} ${bbox.y - padding} ${exportWidth} ${exportHeight}`,
+    );
+
+    const style = document.createElement("style");
+    style.textContent = `
+      svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
+    `;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const ctx = canvas.getContext("2d");
       if (!ctx) {
         URL.revokeObjectURL(url);
         return;
       }
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
-      canvas.toBlob(
-        (b) => {
-          if (!b) return;
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(b);
-          a.download = "fishbone.jpg";
-          a.click();
-          URL.revokeObjectURL(a.href);
-        },
-        "image/jpeg",
-        0.95,
-      );
+      try {
+        ctx.getImageData(0, 0, 1, 1);
+      } catch {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "fishbone-diagram.svg";
+        a.click();
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png", 1.0);
+      a.download = "fishbone-diagram.png";
+      a.click();
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
     };
     img.src = url;
+  }
+
+  async exportPDF() {
+    const svgEl = this.svgRef?.nativeElement;
+    if (!svgEl) return;
+
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    this.replaceForeignObjectsWithSVG(clone);
+
+    const bbox = this.getContentBoundingBox();
+    const padding = 40;
+    const exportWidth = Math.round(bbox.width + padding * 2);
+    const exportHeight = Math.round(bbox.height + padding * 2);
+    clone.setAttribute("width", String(exportWidth));
+    clone.setAttribute("height", String(exportHeight));
+    clone.setAttribute(
+      "viewBox",
+      `${bbox.x - padding} ${bbox.y - padding} ${exportWidth} ${exportHeight}`,
+    );
+
+    const style = document.createElement("style");
+    style.textContent = `svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }`;
+    clone.prepend(style);
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      try {
+        ctx.getImageData(0, 0, 1, 1);
+      } catch {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "fishbone-diagram.svg";
+        a.click();
+        return;
+      }
+      const imgData = canvas.toDataURL("image/png");
+      const orientation = exportWidth > exportHeight ? "l" : "p";
+      const pdf = new jspdf.jsPDF({
+        orientation,
+        unit: "px",
+        format: [exportWidth, exportHeight],
+      });
+      pdf.addImage(imgData, "PNG", 0, 0, exportWidth, exportHeight);
+      pdf.save("fishbone-diagram.pdf");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  private replaceForeignObjectsWithSVG(clone: SVGSVGElement) {
+    // Remove all foreignObjects and draw rectangles + wrapped text instead
+    const ns = "http://www.w3.org/2000/svg";
+    // Remove existing foreignObjects
+    clone.querySelectorAll("foreignObject").forEach((fo) => fo.remove());
+    const overlay = document.createElementNS(ns, "g");
+    overlay.setAttribute("id", "export-labels");
+
+    const lineHeight = 14;
+    const paddingX = 6;
+    const paddingY = 6;
+    const approxChar = 6; // px per char at 10px font
+
+    // Use current component data for positions
+    this.diagram.categories.forEach((category, i) => {
+      category.causes.forEach((cause, j) => {
+        const lay = cause.layout;
+        if (!lay) return;
+        const group = document.createElementNS(ns, "g");
+
+        const rect = document.createElementNS(ns, "rect");
+        rect.setAttribute("x", String(lay.x));
+        rect.setAttribute("y", String(lay.y));
+        rect.setAttribute("width", String(lay.width));
+        rect.setAttribute("height", String(lay.height));
+        rect.setAttribute("fill", "#ffffff");
+        rect.setAttribute("stroke", "#E5E7EB");
+        rect.setAttribute("rx", "8");
+        group.appendChild(rect);
+
+        const leftBar = document.createElementNS(ns, "rect");
+        leftBar.setAttribute("x", String(lay.x));
+        leftBar.setAttribute("y", String(lay.y));
+        leftBar.setAttribute("width", "4");
+        leftBar.setAttribute("height", String(lay.height));
+        leftBar.setAttribute("fill", this.priorityColors[cause.priority]);
+        group.appendChild(leftBar);
+
+        // Word wrap text
+        const maxTextWidth = lay.width - paddingX * 2 - 4;
+        const charsPerLine = Math.max(
+          10,
+          Math.floor(maxTextWidth / approxChar),
+        );
+        const words = cause.text.split(/\s+/);
+        const lines: string[] = [];
+        let current = "";
+        for (const w of words) {
+          const trial = current ? current + " " + w : w;
+          if (trial.length <= charsPerLine) current = trial;
+          else {
+            lines.push(current);
+            current = w;
+          }
+        }
+        if (current) lines.push(current);
+        const maxLines = Math.max(
+          1,
+          Math.floor((lay.height - paddingY * 2) / lineHeight),
+        );
+        const finalLines = lines.slice(0, maxLines);
+
+        finalLines.forEach((ln, idx) => {
+          const text = document.createElementNS(ns, "text");
+          text.setAttribute("x", String(lay.x + 4 + paddingX));
+          text.setAttribute(
+            "y",
+            String(lay.y + paddingY + lineHeight * (idx + 1) - 3),
+          );
+          text.setAttribute("fill", "#111827");
+          text.setAttribute("font-size", "10");
+          text.setAttribute("font-family", "Inter, system-ui, sans-serif");
+          text.textContent = ln;
+          group.appendChild(text);
+        });
+
+        overlay.appendChild(group);
+      });
+    });
+
+    clone.appendChild(overlay);
+  }
+
+  // Level-Based Grid Layout Engine
+
+  // Level-Based Grid Layout Engine
+  runLayoutEngine() {
+    requestAnimationFrame(() => {
+      const measured = this.measureAllLabels();
+      if (measured) {
+        this.calculateGridLayout();
+      }
+    });
+  }
+
+  private calculateVerticalLevels() {
+    const topHeights: number[] = [];
+    const bottomHeights: number[] = [];
+    const pad = this.layoutConfig.levelPadding;
+
+    this.diagram.categories.forEach((cat, i) => {
+      const isTop = this.isTopSide(i);
+      const arr = isTop ? topHeights : bottomHeights;
+      cat.causes.forEach((cause, j) => {
+        const h = cause.layout?.height || this.getLabelHeight(i, j, cause.text);
+        arr[j] = Math.max(arr[j] || 0, h);
+      });
+    });
+
+    let currentTopY = this.spineY - this.layoutConfig.spineStartYOffset;
+    this.topLevelYPositions = topHeights.map((h) => {
+      const y = currentTopY - h;
+      currentTopY -= h + pad;
+      return y;
+    });
+
+    let currentBottomY = this.spineY + this.layoutConfig.spineStartYOffset;
+    this.bottomLevelYPositions = bottomHeights.map((h) => {
+      const y = currentBottomY;
+      currentBottomY += h + pad;
+      return y;
+    });
+  }
+
+  private assignFinalPositions() {
+    const yMapTop = this.topLevelYPositions;
+    const yMapBottom = this.bottomLevelYPositions;
+
+    this.diagram.categories.forEach((category, i) => {
+      const isTop = this.isTopSide(i);
+      const yPositions = isTop ? yMapTop : yMapBottom;
+      category.causes.forEach((cause, j) => {
+        if (!cause.layout || yPositions[j] === undefined) return;
+        cause.layout.y = yPositions[j];
+        const boneX = this.getCauseConnectionX(i, j);
+        const shelf = this.layoutConfig.connectorShelf;
+        const gap = this.layoutConfig.connectorGap;
+        cause.layout.x = boneX - (cause.layout.width ?? 0) - shelf - gap;
+      });
+    });
+
+    this.diagram = { ...this.diagram };
+  }
+
+  private calculateGridLayout() {
+    this.calculateVerticalLevels();
+    this.recomputeCategoryXMap();
+    this.assignFinalPositions();
   }
 
   // Expanded/clamped logic and measurements for labels
@@ -1092,7 +1582,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const id = this.diagram.categories[categoryIndex]?.causes[causeIndex]?.id;
     if (id && this.measuredLabelWidth[id] != null)
       return this.measuredLabelWidth[id];
-    return this.getLabelWidthFromText(text);
+    return this.layoutConfig.fixedCauseWidth;
   }
   private getCharsPerLine(width: number): number {
     return Math.max(10, Math.floor(width / this.approxCharWidth));
@@ -1115,9 +1605,22 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const w = this.getLabelWidth(categoryIndex, causeIndex, text);
     const total = this.getTotalLines(text, w);
     const lines = Math.min(total, this.collapsedLines);
-    const padding = 8;
+    const padding = 12;
     return lines * this.lineHeightPx + padding;
   }
+
+  // Y with collision offsets
+  getLabelY(categoryIndex: number, causeIndex: number, text?: string): number {
+    const t =
+      text ??
+      this.diagram.categories[categoryIndex]?.causes[causeIndex]?.text ??
+      "";
+    const base = this.getStackedCenterY(categoryIndex, causeIndex, t);
+    const id = this.diagram.categories[categoryIndex]?.causes[causeIndex]?.id;
+    const off = (id && this.yOffsets[id]) || 0;
+    return base + off;
+  }
+
   getLabelTopY(
     categoryIndex: number,
     causeIndex: number,
@@ -1132,9 +1635,17 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const target = event.currentTarget as HTMLElement | null;
     if (!target || !target.getBoundingClientRect) return;
     const rect = target.getBoundingClientRect();
+    const margin = 12;
+    const centerX = rect.left + rect.width / 2;
+    let x = centerX;
+    let y = rect.top;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    x = Math.max(margin, Math.min(vw - margin, x));
+    y = Math.max(margin, Math.min(vh - margin, y));
     this.tooltipText = text;
-    this.tooltipX = rect.left + rect.width / 2;
-    this.tooltipY = rect.top;
+    this.tooltipX = x;
+    this.tooltipY = y;
     this.tooltipVisible = true;
   }
   hideTooltip() {
@@ -1157,10 +1668,11 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  private measureAllLabels() {
+  private measureAllLabels(): boolean {
     try {
       const svg = this.svgRef?.nativeElement;
-      if (!svg) return;
+      if (!svg) return false;
+      let allFound = true;
       for (const category of this.diagram.categories) {
         for (const cause of category.causes) {
           const el = svg.querySelector(
@@ -1168,13 +1680,18 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
           ) as HTMLElement | null;
           if (el && typeof el.getBoundingClientRect === "function") {
             const rect = el.getBoundingClientRect();
-            const w = Math.min(Math.ceil(rect.width || 0), this.labelMaxWidth);
-            if (w && w > 0) this.measuredLabelWidth[cause.id] = w;
+            const fixedW = this.layoutConfig.fixedCauseWidth;
+            this.measuredLabelWidth[cause.id] = fixedW;
+            cause.layout = { x: 0, y: 0, width: fixedW, height: rect.height };
+          } else {
+            allFound = false;
           }
         }
       }
+      return allFound;
     } catch (e) {
       console.warn("measureAllLabels failed", e);
+      return false;
     }
   }
   getCauseTextWidth(text: string): number {
@@ -1191,15 +1708,19 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return colors[priority];
   }
 
-  // Dynamic SVG positioning calculations
-  // Category positioning: use measured mapping when available, else fallback spacing
+  // Category positioning
   getCategoryX(index: number): number {
     const id = this.diagram.categories[index]?.id;
     if (id && this.categoryXMap[id] != null) return this.categoryXMap[id];
-    const availableWidth = this.spineEndX - this.spineStartX;
-    const pairsCount = Math.ceil(this.diagram.categories.length / 2);
-    const spacing = availableWidth / (pairsCount + 1);
-    return this.spineStartX + (Math.floor(index / 2) + 1) * spacing;
+    // Safe fallback that does not depend on spineEndX to avoid recursive getters
+    const col = Math.floor(index / 2);
+    const angleRad = (this.layoutConfig.boneAngle * Math.PI) / 180;
+    const projectedBase = Math.cos(angleRad) * 80; // base projected bone length
+    const step =
+      this.layoutConfig.fixedCauseWidth +
+      this.layoutConfig.horizontalColumnGap +
+      projectedBase;
+    return this.layoutConfig.spineStartX + (col + 1) * step;
   }
 
   private getCategoryLength(index: number): number {
@@ -1212,20 +1733,19 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   getCategoryEndX(index: number): number {
     const startX = this.getCategoryX(index);
     const length = this.getCategoryLength(index);
-    const angle = this.isTopSide(index) ? -45 : 45;
+    const angle = this.getCategoryAngle(index);
     return startX + Math.cos((angle * Math.PI) / 180) * length;
   }
 
   getCategoryEndY(index: number): number {
     const length = this.getCategoryLength(index);
-    const angle = this.isTopSide(index) ? -45 : 45;
+    const angle = this.getCategoryAngle(index);
     return this.spineY + Math.sin((angle * Math.PI) / 180) * length;
   }
 
   getCategoryTextX(index: number): number {
     return this.getCategoryEndX(index);
   }
-
   getCategoryTextY(index: number): number {
     return this.getCategoryEndY(index) + (this.isTopSide(index) ? -20 : 20);
   }
@@ -1254,14 +1774,12 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     right: number,
     topSide: boolean,
   ): number {
-    // Across all categories, compute limiting bone Y across the span [left, right]
     let limit = topSide ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
     for (let k = 0; k < this.diagram.categories.length; k++) {
       const x1 = this.getCategoryX(k);
       const x2 = this.getCategoryEndX(k);
       const minX = Math.min(x1, x2);
       const maxX = Math.max(x1, x2);
-      // If span doesn't intersect bone's projection, sample nearest edge
       const sampleL = this.getBoneYAtXClamped(k, left);
       const sampleR = this.getBoneYAtXClamped(k, right);
       const boneSpanIntersects = !(right < minX || left > maxX);
@@ -1278,7 +1796,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return limit;
   }
 
-  // Evenly distribute connection points along the category bone
   getCauseConnectionX(categoryIndex: number, causeIndex: number): number {
     const categoryStartX = this.getCategoryX(categoryIndex);
     const categoryEndX = this.getCategoryEndX(categoryIndex);
@@ -1298,7 +1815,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const base =
       totalCauses === 1 ? 0.5 : 0.1 + (causeIndex / (totalCauses - 1)) * 0.8;
     let cy = this.spineY + (categoryEndY - this.spineY) * base;
-    // Clamp to always remain on the outward side of the spine for this category
     const outwardTop = categoryEndY < this.spineY;
     if (outwardTop) cy = Math.min(cy, this.spineY - 1);
     else cy = Math.max(cy, this.spineY + 1);
@@ -1306,17 +1822,16 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // Spacing/alignment configuration for labels
-  private labelBaseOffset = 24; // closer to spine for compact view
+  private labelBaseOffset = 24;
   private labelHeight = 20;
-  private minGap = 8; // tighter spacing
-  private connectorShelf = 8; // horizontal shelf length
-  private connectorGap = 8; // gap between connector end and label edge
+  private minGap = 8;
+  private connectorShelf = 10;
+  private connectorGap = 8;
 
   private getAntiCollisionStep(): number {
-    return this.labelHeight + this.minGap; // constant step ensures no overlap
+    return this.labelHeight + this.minGap;
   }
 
-  // Compute cumulative offset from spine using actual label heights
   private getOffsetFromSpine(
     categoryIndex: number,
     causeIndex: number,
@@ -1333,7 +1848,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return offset;
   }
 
-  // Raw center Y for a cause before stacking enforcement
   private getRawCenterY(
     categoryIndex: number,
     causeIndex: number,
@@ -1345,7 +1859,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
     const w = this.getLabelWidth(categoryIndex, causeIndex, text);
     const h = this.getLabelHeight(categoryIndex, causeIndex, text);
-    // Alternate above/below around the anchor to keep connectors short
     let center = ay + (causeIndex % 2 === 0 ? -1 : 1) * dir * (h / 2 + 6);
 
     const left = ax - (this.connectorShelf + w);
@@ -1362,7 +1875,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return center;
   }
 
-  // Stacked center Y ensures no overlap with previous causes in same category
   private getStackedCenterY(
     categoryIndex: number,
     causeIndex: number,
@@ -1404,17 +1916,8 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getLabelColumnX(categoryIndex: number): number {
-    // Deprecated for tooth layout; fallback near category start
     const maxW = this.getMaxLabelWidth(categoryIndex);
     return this.getCategoryX(categoryIndex) - this.LABEL_LEFT_PADDING - maxW;
-  }
-
-  getLabelY(categoryIndex: number, causeIndex: number, text?: string): number {
-    const t =
-      text ??
-      this.diagram.categories[categoryIndex]?.causes[causeIndex]?.text ??
-      "";
-    return this.getStackedCenterY(categoryIndex, causeIndex, t);
   }
 
   getLabelCenterX(
@@ -1447,7 +1950,203 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return ax - this.connectorGap;
   }
 
-  // Connector: short shelf then diagonal to branch
+  // Orthogonal connector using stable layout positions
+  getOrthogonalCauseConnectorPath(
+    categoryIndex: number,
+    cause: Cause,
+    causeIndex: number,
+  ): string {
+    const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
+    const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
+    if (!cause.layout) {
+      const y = this.getLabelY(categoryIndex, causeIndex, cause.text);
+      const xr = this.getLabelRightX(categoryIndex, causeIndex, cause.text);
+      const xh = ax - this.layoutConfig.connectorGap;
+      return `M ${xr} ${y} H ${xh} V ${ay} H ${ax}`;
+    }
+    const labelEdgeX = cause.layout.x + cause.layout.width;
+    const labelCenterY = cause.layout.y + cause.layout.height / 2;
+    const intermediateX = ax - 30;
+    return `M ${ax} ${ay} H ${intermediateX} V ${labelCenterY} H ${labelEdgeX}`;
+  }
+
+  isTopSide(index: number): boolean {
+    return index % 2 === 0;
+  }
+
+  // Collision-aware offsets computation
+  private computeCollisionOffsets() {
+    const margin = 6;
+    const top: {
+      id: string;
+      center: number;
+      height: number;
+      indexInfo: [number, number];
+      left: number;
+      right: number;
+    }[] = [];
+    const bottom: {
+      id: string;
+      center: number;
+      height: number;
+      indexInfo: [number, number];
+      left: number;
+      right: number;
+    }[] = [];
+
+    for (let i = 0; i < this.diagram.categories.length; i++) {
+      const cat = this.diagram.categories[i];
+      for (let j = 0; j < cat.causes.length; j++) {
+        const cause = cat.causes[j];
+        const text = cause.text;
+        const w = this.getLabelWidth(i, j, text);
+        const h = this.getLabelHeight(i, j, text);
+        const c = this.getStackedCenterY(i, j, text); // base without offsets
+        const left = this.getLabelLeftX(i, j, text);
+        const right = left + w;
+        const item = {
+          id: cause.id,
+          center: c,
+          height: h,
+          indexInfo: [i, j] as [number, number],
+          left,
+          right,
+        };
+        if (c < this.spineY) top.push(item);
+        else bottom.push(item);
+      }
+    }
+
+    // Helper to adjust along one side, pushing away from spine and resolving overlaps
+    const adjust = (arr: typeof top, isTop: boolean) => {
+      // Pack from spine outward
+      arr.sort((a, b) => (isTop ? b.center - a.center : a.center - b.center)); // closest first
+      for (let k = 0; k < arr.length; k++) {
+        const prev = k === 0 ? null : arr[k - 1];
+        const cur = arr[k];
+        if (!prev) continue;
+        const prevTop = prev.center - prev.height / 2;
+        const prevBottom = prev.center + prev.height / 2;
+        let curTop = cur.center - cur.height / 2;
+        let curBottom = cur.center + cur.height / 2;
+        if (isTop) {
+          // ensure cur is above prev by margin
+          const allowedBottom = prevTop - margin;
+          if (curBottom > allowedBottom) {
+            const newCenter = allowedBottom - cur.height / 2;
+            cur.center = newCenter;
+          }
+        } else {
+          // bottom side: ensure cur is below prev by margin
+          const allowedTop = prevBottom + margin;
+          if (curTop < allowedTop) {
+            const newCenter = allowedTop + cur.height / 2;
+            cur.center = newCenter;
+          }
+        }
+      }
+    };
+
+    adjust(top, true);
+    adjust(bottom, false);
+
+    // Write offsets relative to base centers
+    const newOffsets: Record<string, number> = {};
+    for (const item of [...top, ...bottom]) {
+      const [i, j] = item.indexInfo;
+      const base = this.getStackedCenterY(
+        i,
+        j,
+        this.diagram.categories[i].causes[j].text,
+      );
+      newOffsets[item.id] = item.center - base;
+    }
+    this.yOffsets = newOffsets;
+  }
+
+  // Helper for angles based on content height
+  private getCategoryTotalHeight(index: number): number {
+    const cat = this.diagram.categories[index];
+    if (!cat) return 0;
+    return cat.causes.reduce(
+      (sum, c, j) =>
+        sum + this.getLabelHeight(index, j, c.text) + (j > 0 ? this.minGap : 0),
+      0,
+    );
+  }
+
+  // Pan/Zoom
+  private resetViewIfUnset() {
+    if (this.viewW === 0 || this.viewH === 0) this.resetView();
+  }
+  resetView() {
+    this.viewX = 0;
+    this.viewY = 0;
+    this.viewW = this.canvasWidth;
+    this.viewH = this.canvasHeight;
+  }
+  zoom(factor: number, originX?: number, originY?: number) {
+    const minW = this.canvasWidth / 6;
+    const maxW = this.canvasWidth * 1.5;
+    const cx = originX ?? this.viewX + this.viewW / 2;
+    const cy = originY ?? this.viewY + this.viewH / 2;
+    const newW = Math.max(minW, Math.min(maxW, this.viewW * factor));
+    const newH = Math.max(
+      minW * (this.canvasHeight / this.canvasWidth),
+      Math.min(
+        maxW * (this.canvasHeight / this.canvasWidth),
+        this.viewH * factor,
+      ),
+    );
+    this.viewX = cx - (cx - this.viewX) * (newW / this.viewW);
+    this.viewY = cy - (cy - this.viewY) * (newH / this.viewH);
+    this.viewW = newW;
+    this.viewH = newH;
+  }
+  zoomIn() {
+    this.zoom(0.85);
+  }
+  zoomOut() {
+    this.zoom(1.15);
+  }
+
+  onWheel(event: WheelEvent) {
+    event.preventDefault();
+    const svg = this.svgRef?.nativeElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const sx =
+      ((event.clientX - rect.left) / rect.width) * this.viewW + this.viewX;
+    const sy =
+      ((event.clientY - rect.top) / rect.height) * this.viewH + this.viewY;
+    const factor = event.deltaY < 0 ? 0.9 : 1.1;
+    this.zoom(factor, sx, sy);
+  }
+
+  onMouseDown(event: MouseEvent) {
+    this.isPanning = true;
+    this.panStartX = event.clientX;
+    this.panStartY = event.clientY;
+    this.viewStartX = this.viewX;
+    this.viewStartY = this.viewY;
+  }
+  onMouseMove(event: MouseEvent) {
+    if (!this.isPanning) return;
+    const svg = this.svgRef?.nativeElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const dxPx = event.clientX - this.panStartX;
+    const dyPx = event.clientY - this.panStartY;
+    const dx = (dxPx / rect.width) * this.viewW;
+    const dy = (dyPx / rect.height) * this.viewH;
+    this.viewX = this.viewStartX - dx;
+    this.viewY = this.viewStartY - dy;
+  }
+  onMouseUp() {
+    this.isPanning = false;
+  }
+
+  // Connector path (legacy kept if needed elsewhere)
   getCauseConnectorPath(
     categoryIndex: number,
     causeIndex: number,
@@ -1461,8 +2160,8 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return `M ${xr} ${y} H ${shelfEnd} L ${ax} ${ay}`;
   }
 
-  isTopSide(index: number): boolean {
-    return index % 2 === 0;
+  isTop(index: number) {
+    return this.isTopSide(index);
   }
 
   // Color utilities
@@ -1482,5 +2181,21 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  // Context menu helpers
+  toggleCauseMenu(cause: Cause, ev: MouseEvent) {
+    ev.stopPropagation();
+    this.openMenuForCauseId =
+      this.openMenuForCauseId === cause.id ? null : cause.id;
+  }
+  closeCauseMenu() {
+    this.openMenuForCauseId = null;
+  }
+
+  @HostListener("document:click")
+  onDocClick() {
+    this.openMenuForCauseId = null;
+    this.isExportMenuOpen = false;
   }
 }
