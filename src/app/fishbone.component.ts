@@ -595,6 +595,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     const newText = prompt("Edit cause description:", cause.text);
     if (newText && newText.trim()) {
       cause.text = newText.trim();
+      this.runLayoutAfterRender();
     }
   }
 
