@@ -315,9 +315,13 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Grid layout configuration and state
   private layoutConfig = {
-    levelPadding: 20,
-    horizontalPairGap: 80,
-    boneLengthBuffer: 60,
+    fixedCauseWidth: 240, // Tailwind w-60 (15rem)
+    levelPadding: 15,
+    horizontalColumnGap: 40,
+    spineStartX: 80,
+    problemStatementWidth: 200,
+    problemStatementGap: 50,
+    boneAngle: 45,
     spineStartYOffset: 40,
     connectorShelf: 10,
     connectorGap: 5,
