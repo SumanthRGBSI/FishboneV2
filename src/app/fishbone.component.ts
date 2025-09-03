@@ -179,7 +179,7 @@ interface DiagramData {
                   </div>
                 </foreignObject>
                 <!-- Delete cause icon (trash) -->
-                <svg [attr.x]="getLabelRightX(i, j, cause.text) - 10" [attr.y]="getLabelY(i, j, cause.text) - 6" width="12" height="12" viewBox="0 0 24 24" [attr.opacity]="hoveredCauseId === cause.id ? 1 : 0" class="cursor-pointer" (click)="deleteCause(category, cause)">
+                <svg [attr.x]="((cause.layout?.x ?? getLabelLeftX(i, j, cause.text)) + (cause.layout?.width ?? getLabelWidth(i, j, cause.text)) - 10)" [attr.y]="((cause.layout?.y ?? getLabelTopY(i, j, cause.text)) + ((cause.layout?.height ?? getLabelHeight(i, j, cause.text)) / 2) - 6)" width="12" height="12" viewBox="0 0 24 24" [attr.opacity]="hoveredCauseId === cause.id ? 1 : 0" class="cursor-pointer" (click)="deleteCause(category, cause)">
                   <path d="M19 7l-1 12a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7m3 0V5a2 2 0 012-2h4a2 2 0 012 2v2m-9 0h10" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </g>
