@@ -688,6 +688,71 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     img.src = url;
   }
 
+  // Level-Based Grid Layout Engine
+  runLayoutEngine() {
+    requestAnimationFrame(() => {
+      const measured = this.measureAllLabels();
+      if (measured) {
+        this.calculateGridLayout();
+      }
+    });
+  }
+
+  private calculateVerticalLevels() {
+    const topHeights: number[] = [];
+    const bottomHeights: number[] = [];
+    const pad = this.layoutConfig.levelPadding;
+
+    this.diagram.categories.forEach((cat, i) => {
+      const isTop = this.isTopSide(i);
+      const arr = isTop ? topHeights : bottomHeights;
+      cat.causes.forEach((cause, j) => {
+        const h = cause.layout?.height || this.getLabelHeight(i, j, cause.text);
+        arr[j] = Math.max(arr[j] || 0, h);
+      });
+    });
+
+    let currentTopY = this.spineY - this.layoutConfig.spineStartYOffset;
+    this.topLevelYPositions = topHeights.map((h) => {
+      const y = currentTopY - h;
+      currentTopY -= h + pad;
+      return y;
+    });
+
+    let currentBottomY = this.spineY + this.layoutConfig.spineStartYOffset;
+    this.bottomLevelYPositions = bottomHeights.map((h) => {
+      const y = currentBottomY;
+      currentBottomY += h + pad;
+      return y;
+    });
+  }
+
+  private assignFinalPositions() {
+    const yMapTop = this.topLevelYPositions;
+    const yMapBottom = this.bottomLevelYPositions;
+
+    this.diagram.categories.forEach((category, i) => {
+      const isTop = this.isTopSide(i);
+      const yPositions = isTop ? yMapTop : yMapBottom;
+      category.causes.forEach((cause, j) => {
+        if (!cause.layout || yPositions[j] === undefined) return;
+        cause.layout.y = yPositions[j];
+        const boneX = this.getCauseConnectionX(i, j);
+        const shelf = this.layoutConfig.connectorShelf;
+        const gap = this.layoutConfig.connectorGap;
+        cause.layout.x = boneX - (cause.layout.width ?? 0) - shelf - gap;
+      });
+    });
+
+    this.diagram = { ...this.diagram };
+  }
+
+  private calculateGridLayout() {
+    this.calculateVerticalLevels();
+    this.recomputeCategoryXMap();
+    this.assignFinalPositions();
+  }
+
   // Expanded/clamped logic and measurements for labels
   isExpanded(cause: Cause): boolean { return this.expandedCauses.has(cause.id); }
   toggleExpand(cause: Cause, event?: MouseEvent) {
