@@ -1445,5 +1445,5 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   closeCauseMenu() { this.openMenuForCauseId = null; }
 
   @HostListener('document:click')
-  onDocClick() { this.openMenuForCauseId = null; }
+  onDocClick() { this.openMenuForCauseId = null; this.isExportMenuOpen = false; }
 }
