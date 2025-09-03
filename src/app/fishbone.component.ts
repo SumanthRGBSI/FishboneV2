@@ -718,6 +718,9 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!svgEl) return;
     const clone = svgEl.cloneNode(true) as SVGSVGElement;
 
+    // Replace foreignObject with pure SVG for portability
+    this.replaceForeignObjectsWithSVG(clone);
+
     const bbox = this.getContentBoundingBox();
     const padding = 20;
     clone.setAttribute('width', String(bbox.width + padding * 2));
@@ -726,8 +729,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const style = document.createElement('style');
     style.textContent = `
-      .cause-box { font-family: Inter, system-ui, sans-serif; font-size: 10px; line-height: 14px; color: #111827; background: #ffffff; border: 1px solid #E5E7EB; border-left-width: 4px; border-radius: 8px; padding: 6px 8px; display: inline-block; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); overflow-wrap: anywhere; word-break: break-word; }
-      .cause-text { overflow-wrap: anywhere; word-break: break-word; }
       svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
     `;
     clone.prepend(style);
@@ -747,6 +748,9 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!svgEl) return;
 
     const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    // Ensure no foreignObject remains to avoid tainting canvas
+    this.replaceForeignObjectsWithSVG(clone);
+
     const bbox = this.getContentBoundingBox();
     const padding = 20;
     const exportWidth = Math.round(bbox.width + padding * 2);
@@ -757,8 +761,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const style = document.createElement('style');
     style.textContent = `
-      .cause-box { font-family: Inter, system-ui, sans-serif; font-size: 10px; line-height: 14px; color: #111827; background: #ffffff; border: 1px solid #E5E7EB; border-left-width: 4px; border-radius: 8px; padding: 6px 8px; display: inline-block; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); overflow-wrap: anywhere; word-break: break-word; }
-      .cause-text { overflow-wrap: anywhere; word-break: break-word; }
       svg text { user-select: none; font-family: Inter, system-ui, sans-serif; }
     `;
     clone.prepend(style);
@@ -778,14 +780,96 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png', 1.0);
-      a.download = 'fishbone-diagram.png';
-      a.click();
+      try {
+        // Attempt to read pixel to ensure non-tainted
+        ctx.getImageData(0, 0, 1, 1);
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png', 1.0);
+        a.download = 'fishbone-diagram.png';
+        a.click();
+      } catch {
+        // Fallback: download SVG instead
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fishbone-diagram.svg';
+        a.click();
+      }
     };
     img.onerror = () => { URL.revokeObjectURL(url); };
     img.src = url;
   }
+
+  private replaceForeignObjectsWithSVG(clone: SVGSVGElement) {
+    // Remove all foreignObjects and draw rectangles + wrapped text instead
+    const ns = 'http://www.w3.org/2000/svg';
+    // Remove existing foreignObjects
+    clone.querySelectorAll('foreignObject').forEach((fo) => fo.remove());
+    const overlay = document.createElementNS(ns, 'g');
+    overlay.setAttribute('id', 'export-labels');
+
+    const lineHeight = 14;
+    const paddingX = 6;
+    const paddingY = 6;
+    const approxChar = 6; // px per char at 10px font
+
+    // Use current component data for positions
+    this.diagram.categories.forEach((category, i) => {
+      category.causes.forEach((cause, j) => {
+        const lay = cause.layout;
+        if (!lay) return;
+        const group = document.createElementNS(ns, 'g');
+
+        const rect = document.createElementNS(ns, 'rect');
+        rect.setAttribute('x', String(lay.x));
+        rect.setAttribute('y', String(lay.y));
+        rect.setAttribute('width', String(lay.width));
+        rect.setAttribute('height', String(lay.height));
+        rect.setAttribute('fill', '#ffffff');
+        rect.setAttribute('stroke', '#E5E7EB');
+        rect.setAttribute('rx', '8');
+        group.appendChild(rect);
+
+        const leftBar = document.createElementNS(ns, 'rect');
+        leftBar.setAttribute('x', String(lay.x));
+        leftBar.setAttribute('y', String(lay.y));
+        leftBar.setAttribute('width', '4');
+        leftBar.setAttribute('height', String(lay.height));
+        leftBar.setAttribute('fill', this.priorityColors[cause.priority]);
+        group.appendChild(leftBar);
+
+        // Word wrap text
+        const maxTextWidth = lay.width - paddingX * 2 - 4;
+        const charsPerLine = Math.max(10, Math.floor(maxTextWidth / approxChar));
+        const words = cause.text.split(/\s+/);
+        const lines: string[] = [];
+        let current = '';
+        for (const w of words) {
+          const trial = current ? current + ' ' + w : w;
+          if (trial.length <= charsPerLine) current = trial; else { lines.push(current); current = w; }
+        }
+        if (current) lines.push(current);
+        const maxLines = Math.max(1, Math.floor((lay.height - paddingY * 2) / lineHeight));
+        const finalLines = lines.slice(0, maxLines);
+
+        finalLines.forEach((ln, idx) => {
+          const text = document.createElementNS(ns, 'text');
+          text.setAttribute('x', String(lay.x + 4 + paddingX));
+          text.setAttribute('y', String(lay.y + paddingY + lineHeight * (idx + 1) - 3));
+          text.setAttribute('fill', '#111827');
+          text.setAttribute('font-size', '10');
+          text.setAttribute('font-family', 'Inter, system-ui, sans-serif');
+          text.textContent = ln;
+          group.appendChild(text);
+        });
+
+        overlay.appendChild(group);
+      });
+    });
+
+    clone.appendChild(overlay);
+  }
+
+  // Level-Based Grid Layout Engine
 
   // Level-Based Grid Layout Engine
   runLayoutEngine() {
