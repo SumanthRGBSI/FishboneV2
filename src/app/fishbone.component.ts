@@ -795,11 +795,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // Sequential layout mapping
-  private SAFE_MARGIN = 110;
-  private INITIAL_X = 140;
-  private LABEL_LEFT_PADDING = 16;
   private categoryXMap: Record<string, number> = {};
-  private categoryAngleMap: Record<string, number> = {};
 
   // Grid layout configuration and state
   private layoutConfig = {
@@ -907,20 +903,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private recomputeAngles() {
-    const map: Record<string, number> = {};
-    for (let i = 0; i < this.diagram.categories.length; i++) {
-      const cat = this.diagram.categories[i];
-      const complexity = this.getCategoryTotalHeight(i);
-      const minAngle = 35;
-      const maxAngle = 70;
-      const base = 45;
-      const t = Math.max(0, Math.min(1, (complexity - 120) / 240));
-      const angle = base + (maxAngle - base) * t; // 45..70
-      map[cat.id] = this.isTopSide(i) ? -angle : angle;
-    }
-    this.categoryAngleMap = map;
-  }
 
   private getCategoryAngle(index: number): number {
     const angle = this.layoutConfig.boneAngle;
@@ -1161,88 +1143,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch {}
   }
 
-  // Legacy kept but not used
-  exportJPG() {
-    const svgEl = this.svgRef?.nativeElement;
-    if (!svgEl) return;
-
-    const serializer = new XMLSerializer();
-    let svgString = serializer.serializeToString(svgEl);
-
-    // Remove all foreignObject nodes to avoid tainted canvas, and keep problem text
-    const problemText =
-      this.diagram.problemStatement || "Add Problem Statement";
-    const textX = this.problemBoxX + this.problemBoxWidth / 2;
-    const textY = this.problemBoxY - 10; // place above spine
-    svgString = svgString.replace(
-      /<foreignObject[\s\S]*?<\/foreignObject>/g,
-      "",
-    );
-    svgString = svgString.replace(
-      /<text[^>]*>\s*.*?\s*<\/text>/,
-      `<text x="${textX}" y="${textY}" fill="#111827" font-size="18" font-weight="800" text-anchor="middle" dominant-baseline="baseline">${problemText
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")}</text>`,
-    );
-
-    const svgDataUrl =
-      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    const width = this.canvasWidth;
-    const height = this.canvasHeight;
-
-    const fallbackDownloadSVG = () => {
-      const blob = new Blob([svgString], {
-        type: "image/svg+xml;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "fishbone.svg";
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return fallbackDownloadSVG();
-      try {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        // Detect tainted canvas early
-        try {
-          ctx.getImageData(0, 0, 1, 1);
-        } catch {
-          return fallbackDownloadSVG();
-        }
-        try {
-          canvas.toBlob(
-            (b) => {
-              if (!b) return fallbackDownloadSVG();
-              const a = document.createElement("a");
-              a.href = URL.createObjectURL(b);
-              a.download = "fishbone.jpg";
-              a.click();
-              URL.revokeObjectURL(a.href);
-            },
-            "image/jpeg",
-            0.95,
-          );
-        } catch {
-          fallbackDownloadSVG();
-        }
-      } catch {
-        fallbackDownloadSVG();
-      }
-    };
-    img.onerror = () => fallbackDownloadSVG();
-    img.src = svgDataUrl;
-  }
 
   // Compute a content bounding box for export
   private getContentBoundingBox() {
@@ -1653,11 +1553,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // Utility functions
-  getTruncatedText(text: string, maxLength: number): string {
-    return text.length > maxLength
-      ? text.substring(0, maxLength) + "..."
-      : text;
-  }
 
   labelMaxWidth = 300;
   private approxCharWidth = 7;
@@ -1698,15 +1593,6 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.getLabelWidthFromText(text);
   }
 
-  getPriorityIndicatorColor(priority: Priority): string {
-    const colors = {
-      Critical: "#ffffff",
-      High: "#ffffff",
-      Medium: "#ffffff",
-      Low: "#ffffff",
-    };
-    return colors[priority];
-  }
 
   // Category positioning
   getCategoryX(index: number): number {
@@ -1915,21 +1801,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     }, 120);
   }
 
-  private getLabelColumnX(categoryIndex: number): number {
-    const maxW = this.getMaxLabelWidth(categoryIndex);
-    return this.getCategoryX(categoryIndex) - this.LABEL_LEFT_PADDING - maxW;
-  }
 
-  getLabelCenterX(
-    categoryIndex: number,
-    causeIndex: number,
-    text: string,
-  ): number {
-    const w = this.getLabelWidth(categoryIndex, causeIndex, text);
-    const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
-    const left = ax - (this.connectorShelf + w);
-    return left + w / 2;
-  }
 
   getLabelLeftX(
     categoryIndex: number,
@@ -2146,23 +2018,7 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isPanning = false;
   }
 
-  // Connector path (legacy kept if needed elsewhere)
-  getCauseConnectorPath(
-    categoryIndex: number,
-    causeIndex: number,
-    text: string,
-  ): string {
-    const ax = this.getCauseConnectionX(categoryIndex, causeIndex);
-    const ay = this.getCauseConnectionY(categoryIndex, causeIndex);
-    const y = this.getLabelY(categoryIndex, causeIndex, text);
-    const xr = this.getLabelRightX(categoryIndex, causeIndex, text);
-    const shelfEnd = xr - this.connectorShelf;
-    return `M ${xr} ${y} H ${shelfEnd} L ${ax} ${ay}`;
-  }
 
-  isTop(index: number) {
-    return this.isTopSide(index);
-  }
 
   // Color utilities
   getTint(hex: string, alpha: number): string {
