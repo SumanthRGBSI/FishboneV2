@@ -387,39 +387,34 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private recomputeCategoryXMap() {
-    const newMap: Record<string, number> = {};
-    const count = this.diagram.categories.length;
-    const pairs = Math.ceil(count / 2);
-    let prevRight = this.spineStartX;
-    let baseline = this.spineStartX + this.INITIAL_X;
-    const tipPad = 20;
+    const horizontalColumnGap = this.layoutConfig.horizontalPairGap;
+    let previousColumnEndX = this.spineStartX;
+    const maxLevels = this.diagram.categories.reduce((max, cat) => Math.max(max, cat.causes.length), 0);
 
-    for (let p = 0; p < pairs; p++) {
-      const topIdx = p * 2;
-      const botIdx = topIdx + 1;
+    for (let i = 0; i < this.diagram.categories.length; i += 2) {
+      const topCat = this.diagram.categories[i];
+      const bottomCat = this.diagram.categories[i + 1];
 
-      const leftExtTop = topIdx < count ? this.getMaxLabelWidth(topIdx) + this.LABEL_LEFT_PADDING : 0;
-      const leftExtBot = botIdx < count ? this.getMaxLabelWidth(botIdx) + this.LABEL_LEFT_PADDING : 0;
-      const maxLeftExt = Math.max(leftExtTop, leftExtBot);
+      let maxLabelWidthInCurrentColumn = 0;
+      for (let level = 0; level < maxLevels; level++) {
+        const topWidth = topCat?.causes[level]?.layout?.width || 0;
+        const bottomWidth = bottomCat?.causes[level]?.layout?.width || 0;
+        maxLabelWidthInCurrentColumn = Math.max(maxLabelWidthInCurrentColumn, topWidth, bottomWidth);
+      }
 
-      const rightFoot = (idx: number) => {
-        if (idx >= count) return 0;
+      const boneX = previousColumnEndX + maxLabelWidthInCurrentColumn + horizontalColumnGap;
+      if (topCat) this.categoryXMap[topCat.id] = boneX;
+      if (bottomCat) this.categoryXMap[bottomCat.id] = boneX;
+
+      const rightProj = (idx: number) => {
+        if (idx >= this.diagram.categories.length) return 0;
         const length = this.getCategoryLength(idx);
-        const bone = Math.cos((45 * Math.PI) / 180) * length;
-        return bone + tipPad;
+        const angle = Math.abs(this.getCategoryAngle(idx));
+        return Math.cos((angle * Math.PI) / 180) * length;
       };
-      const maxRightExt = Math.max(rightFoot(topIdx), rightFoot(botIdx));
-
-      const startX = Math.max(baseline, prevRight + this.SAFE_MARGIN + maxLeftExt);
-
-      if (topIdx < count) newMap[this.diagram.categories[topIdx].id] = startX;
-      if (botIdx < count) newMap[this.diagram.categories[botIdx].id] = startX;
-
-      prevRight = startX + maxRightExt;
-      baseline = prevRight;
+      const proj = Math.max(rightProj(i), rightProj(i + 1));
+      previousColumnEndX = boneX + proj;
     }
-
-    this.categoryXMap = newMap;
   }
 
   private recomputeAngles() {
