@@ -824,9 +824,9 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
           const el = svg.querySelector(`div.cause-box[data-cause-id="${cause.id}"]`) as HTMLElement | null;
           if (el && typeof el.getBoundingClientRect === "function") {
             const rect = el.getBoundingClientRect();
-            const w = Math.min(Math.ceil(rect.width || 0), this.labelMaxWidth);
-            if (w && w > 0) this.measuredLabelWidth[cause.id] = w;
-            cause.layout = { x: 0, y: 0, width: rect.width, height: rect.height };
+            const fixedW = this.layoutConfig.fixedCauseWidth;
+            this.measuredLabelWidth[cause.id] = fixedW;
+            cause.layout = { x: 0, y: 0, width: fixedW, height: rect.height };
           } else {
             allFound = false;
           }
