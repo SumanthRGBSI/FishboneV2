@@ -463,29 +463,30 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   // Dynamic canvas dimensions
+  get lastBoneEndX(): number {
+    if (this.diagram.categories.length === 0) return this.spineStartX;
+    const lastIndex = this.diagram.categories.length - 1;
+    const lastCat = this.diagram.categories[lastIndex];
+    const boneX = this.categoryXMap[lastCat.id] ?? this.getCategoryX(lastIndex);
+    const angle = Math.abs(this.getCategoryAngle(lastIndex));
+    const horiz = Math.cos((angle * Math.PI) / 180) * this.getCategoryLength(lastIndex);
+    return boneX + horiz;
+  }
+
+  get spineEndX(): number {
+    return this.lastBoneEndX + this.layoutConfig.problemStatementGap;
+  }
+
+  get problemBoxX(): number {
+    return this.spineEndX + 20;
+  }
+
+  get problemBoxWidth(): number {
+    return this.layoutConfig.problemStatementWidth;
+  }
+
   get canvasWidth(): number {
-    const minWidth = 520;
-    const count = this.diagram.categories.length;
-    const pairs = Math.ceil(Math.max(count, 2) / 2);
-    let prevRight = this.spineStartX;
-    let baseline = this.spineStartX + this.INITIAL_X;
-    const tipPad = 28;
-    for (let p = 0; p < pairs; p++) {
-      const topIdx = p * 2;
-      const botIdx = topIdx + 1;
-      const leftExt = Math.max(
-        topIdx < count ? this.getMaxLabelWidth(topIdx) + this.LABEL_LEFT_PADDING : 0,
-        botIdx < count ? this.getMaxLabelWidth(botIdx) + this.LABEL_LEFT_PADDING : 0,
-      );
-      const rightExt = Math.max(
-        topIdx < count ? Math.cos((45 * Math.PI) / 180) * this.getCategoryLength(topIdx) + tipPad : 0,
-        botIdx < count ? Math.cos((45 * Math.PI) / 180) * this.getCategoryLength(botIdx) + tipPad : 0,
-      );
-      const startX = Math.max(baseline, prevRight + this.SAFE_MARGIN + leftExt);
-      prevRight = startX + rightExt;
-      baseline = prevRight;
-    }
-    return Math.max(minWidth, prevRight + 260);
+    return this.problemBoxX + this.layoutConfig.problemStatementWidth + 40;
   }
 
   get canvasHeight(): number {
