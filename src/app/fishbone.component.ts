@@ -653,54 +653,52 @@ export class FishboneComponent implements OnInit, AfterViewInit, OnDestroy {
         .replace(/</g, "&lt;")}</text>`,
     );
 
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+    const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    img.crossOrigin = 'anonymous';
     const width = this.canvasWidth;
     const height = this.canvasHeight;
 
     const fallbackDownloadSVG = () => {
-      const a = document.createElement("a");
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "fishbone.svg";
+      a.download = 'fishbone.svg';
       a.click();
       URL.revokeObjectURL(url);
     };
 
     img.onload = () => {
-      const canvas = document.createElement("canvas");
+      const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        return;
-      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return fallbackDownloadSVG();
       try {
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        URL.revokeObjectURL(url);
-        canvas.toBlob(
-          (b) => {
-            if (!b) return fallbackDownloadSVG();
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(b);
-            a.download = "fishbone.jpg";
-            a.click();
-            URL.revokeObjectURL(a.href);
-          },
-          "image/jpeg",
-          0.95,
-        );
-      } catch (e) {
-        // If canvas is tainted for any reason, fallback to downloading the SVG
-        fallbackDownloadSVG();
-      }
+        // Detect tainted canvas early
+        try { ctx.getImageData(0, 0, 1, 1); } catch { return fallbackDownloadSVG(); }
+        try {
+          canvas.toBlob(
+            (b) => {
+              if (!b) return fallbackDownloadSVG();
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(b);
+              a.download = 'fishbone.jpg';
+              a.click();
+              URL.revokeObjectURL(a.href);
+            },
+            'image/jpeg',
+            0.95,
+          );
+        } catch { fallbackDownloadSVG(); }
+      } catch { fallbackDownloadSVG(); }
     };
     img.onerror = () => fallbackDownloadSVG();
-    img.src = url;
+    img.src = svgDataUrl;
   }
 
   // Level-Based Grid Layout Engine
